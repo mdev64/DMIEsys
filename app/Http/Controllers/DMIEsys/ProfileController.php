@@ -2,19 +2,21 @@
 
 namespace App\Http\Controllers\DMIEsys;
 
+use App\Http\Controllers\Controller;
 use App\Models\User;
 use Axiom\Rules\DisposableEmail;
 use Axiom\Rules\TelephoneNumber;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
-use Intervention\Image\Facades\Image;
-use App\Http\Controllers\Controller;
+use Illuminate\View\View;
+use Intervention\Image\Laravel\Facades\Image;
 
 class ProfileController extends Controller
 {
     /**
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function create()
     {
@@ -24,7 +26,7 @@ class ProfileController extends Controller
     }
 
     /**
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function edit(string $username)
     {
@@ -34,9 +36,7 @@ class ProfileController extends Controller
     }
 
     /**
-     * @param int $id
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function update(int $id, Request $request)
     {
@@ -48,7 +48,7 @@ class ProfileController extends Controller
                 'name' => 'required|string|max:100',
                 'email' => ['required', 'email', new DisposableEmail, 'max:50'],
                 'phone' => ['nullable', new TelephoneNumber],
-                'profilePicture' => 'bail|nullable|image|max:1024|dimensions:min_width=300,min_height=300'
+                'profilePicture' => 'bail|nullable|image|max:1024|dimensions:min_width=300,min_height=300',
             ]);
 
             $photoname = auth()->user()->profile_photo_path;
@@ -56,16 +56,16 @@ class ProfileController extends Controller
             if ($request->hasFile('profilePicture')) {
                 if ($photoname) {
                     try {
-                        if (File::exists(config('settings.system.path') . 'storage/profile-pictures/' . $photoname)) {
-                            File::delete(config('settings.system.path') . 'storage/profile-pictures/' . $photoname);
+                        if (File::exists(config('settings.system.path').'storage/profile-pictures/'.$photoname)) {
+                            File::delete(config('settings.system.path').'storage/profile-pictures/'.$photoname);
                         }
                     } catch (\Throwable $th) {
                         $this->failed($th);
                     }
                 }
                 $extention = $request->file('profilePicture')->getClientOriginalExtension();
-                $photoname = md5(Str::random(20)) . '.' . $extention;
-                Image::make($request->file('profilePicture'))->fit(300)->save('storage/profile-pictures/' . $photoname);
+                $photoname = md5(Str::random(20)).'.'.$extention;
+                Image::read($request->file('profilePicture'))->cover(300, 300)->save('storage/profile-pictures/'.$photoname);
             }
 
             try {
@@ -78,27 +78,32 @@ class ProfileController extends Controller
                 $this->passed('User updated the profile');
             } catch (\Throwable $th) {
                 $this->failed($th);
+
                 return back()->withErrors($th->getMessage())->withInput();
             }
             try {
                 if (auth()->user()->email != $request->email) {
                     $user = User::findOrFail(auth()->user()->id);
-                    $user->newEmail($request->email);
+                    $user->email = $request->email;
                     $user->save();
                     $this->passed('User updated the email');
-                    return back()->with('toast_success', 'Please verify the new email address to get it updated.');
+
+                    return back()->with('toast_success', 'Email updated successfully.');
                 }
             } catch (\Throwable $th) {
                 $this->failed($th);
+
                 return back()->withErrors($th->getMessage())->withInput();
             }
+
             return back()->with('toast_success', 'Profile updated!');
-        } else return back()->withErrors('Something went wrong');
+        } else {
+            return back()->withErrors('Something went wrong');
+        }
     }
 
     /**
-     * @param int $user_id
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function destroy(int $user_id)
     {
@@ -108,10 +113,12 @@ class ProfileController extends Controller
             $user->delete();
         } catch (\Throwable $th) {
             $this->failed($th);
-            return back()->withErrors("There was a problem, please check the logs to see more about this!");
+
+            return back()->withErrors('There was a problem, please check the logs to see more about this!');
         }
-        $this->passed($user->name . ' was deleted');
-        return back()->with('toast_success', $user->name . '\'s account deleted successfully!');
+        $this->passed($user->name.' was deleted');
+
+        return back()->with('toast_success', $user->name.'\'s account deleted successfully!');
     }
 
     public function seeTheUpdates()

@@ -59,7 +59,7 @@
                     </tr>
                     <tr>
                         <td class="text-md font-normal text-gray-800 dark:text-gray-500">
-                            {{ auth()->user()->getRoleNames()[0] }}
+                            {{ auth()->user()->getRoleNames()->first() ?? 'No Role' }}
                         </td>
                     </tr>
                 </tbody>

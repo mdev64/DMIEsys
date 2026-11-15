@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-
     public function up()
     {
         Schema::create('assignment_marks', function (Blueprint $table) {
@@ -30,7 +29,7 @@ return new class extends Migration
             $table->foreign('course_code')->references('course_code')->on('general_courses')->onUpdate('cascade')->onDelete('cascade');
             $table->foreign('course_id')->references('course_id')->on('courses')->onUpdate('cascade')->onDelete('cascade');
             $table->foreign('student_id')->references('student_id')->on('students')->onUpdate('cascade')->onDelete('cascade');
-            $table->foreign('assignment_code')->references('assignment_code')->on('assignments')->onUpdate('cascade')->onDelete('cascade');
+            $table->foreign(['assignment_code', 'course_code'])->references(['assignment_code', 'course_code'])->on('assignments')->onUpdate('cascade')->onDelete('cascade');
         });
     }
 };

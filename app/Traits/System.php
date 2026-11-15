@@ -4,23 +4,40 @@ namespace App\Traits;
 
 use App\Models\Log;
 use App\Models\User;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 
 trait System
 {
     public function can(string $action): bool
     {
-        $thisUser = User::find(auth()->user()->id);
-        if ($thisUser->getRoleNames()[0] == 'Super Admin') return True;
-        else if ($thisUser->hasPermissionTo($action)) return True;
-        else return False;
+        try {
+            $thisUser = User::find(auth()->user()->id);
+            if ($thisUser->hasRole('Super Admin')) {
+                return true;
+            } elseif ($thisUser->hasPermissionTo($action)) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (PermissionDoesNotExist $e) {
+            return false;
+        }
     }
 
     public function canAny(array $action): bool
     {
-        $thisUser = User::find(auth()->user()->id);
-        if ($thisUser->getRoleNames()[0] == 'Super Admin') return True;
-        else if ($thisUser->hasAnyPermission($action)) return True;
-        else return False;
+        try {
+            $thisUser = User::find(auth()->user()->id);
+            if ($thisUser->hasRole('Super Admin')) {
+                return true;
+            } elseif ($thisUser->hasAnyPermission($action)) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (PermissionDoesNotExist $e) {
+            return false;
+        }
     }
 
     public function passed(string $message): void

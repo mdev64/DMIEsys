@@ -2,17 +2,19 @@
 
 namespace App\Http\Controllers\DMIEsys;
 
+use App\Http\Controllers\Controller;
 use App\Imports\ExcelImport;
 use App\Models\Inventory;
 use App\Traits\Notify;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
-use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Str;
-use Intervention\Image\Facades\Image;
-use App\Http\Controllers\Controller;
+use Illuminate\View\View;
+use Intervention\Image\Laravel\Facades\Image;
+use Maatwebsite\Excel\Facades\Excel;
 
 class InventoryController extends Controller
 {
@@ -22,6 +24,7 @@ class InventoryController extends Controller
     {
         /* Checking if the user has the ability to add, see, edit, or delete inventory. */
         abort_unless(($this->canAny(['add inventory', 'see inventory', 'edit inventory', 'delete inventory'])), 404);
+
         /* Returning the view of the laboratories.inventory page. */
         return view('dmiesys.laboratories.inventory');
     }
@@ -29,8 +32,7 @@ class InventoryController extends Controller
     /**
      * Display the specified resource.
      *
-     * @param  string  $id
-     * @return \Illuminate\Http\RedirectResponse|\Illuminate\View\View
+     * @return RedirectResponse|View
      */
     public function show(string $id)
     {
@@ -38,6 +40,7 @@ class InventoryController extends Controller
         abort_unless(($this->can('see inventory')), 404);
         /* Finding the item in the inventory table where the item_code is equal to the id. */
         $item = Inventory::where('item_code', $id)->firstOrFail();
+
         /* Returning the view of the inventory item. */
         return view('dmiesys.laboratories.inventory-item', compact('item'));
     }
@@ -47,7 +50,7 @@ class InventoryController extends Controller
         abort_unless(($this->can('add inventory')), 404);
 
         /* Checking if the request type is equal to "add item to inventory" */
-        if ($request->_type == "add item to inventory") {
+        if ($request->_type == 'add item to inventory') {
             /* Validating the request. */
             Validator::make($request->all(), [
                 'item_code' => 'required|string|max:50',
@@ -74,10 +77,11 @@ class InventoryController extends Controller
             if ($request->hasFile('photo')) {
                 try {
                     $extention = $request->file('photo')->getClientOriginalExtension();
-                    $photoname = md5(Str::random(20)) . '.' . $extention;
-                    Image::make($request->file('photo'))->fit(800, 600)->save('storage/inventory-item-photos/' . $photoname);
+                    $photoname = md5(Str::random(20)).'.'.$extention;
+                    Image::read($request->file('photo'))->cover(800, 600)->save('storage/inventory-item-photos/'.$photoname);
                 } catch (\Throwable $th) {
                     $this->failed($th);
+
                     return back()->withErrors('Something went wrong when uploading the image.');
                 }
             }
@@ -100,22 +104,24 @@ class InventoryController extends Controller
                 $item->remark = $request->remark;
                 $item->image_path = $photoname;
                 $item->save();
-                $this->passed($request->item_code . ' item added to the inventory');
+                $this->passed($request->item_code.' item added to the inventory');
+
                 return back()->with('toast_success', 'Inventory item added successfully!');
             } catch (\Throwable $th) {
                 $this->failed($th);
+
                 return back()->withErrors('Something went wrong. Please check the data again.');
             }
-        } elseif ($request->_type == "add items to inventory") {
+        } elseif ($request->_type == 'add items to inventory') {
             Validator::make($request->all(), [
                 'inventory_item_list' => 'required|mimes:xlsx|max:5120',
             ])->validate();
 
             $file = $request->file('inventory_item_list');
-            $items = Excel::toArray(new ExcelImport(), $file);
+            $items = Excel::toArray(new ExcelImport, $file);
             $items = $items[0];
 
-            //validation
+            // validation
             foreach ($items as $item) {
                 Validator::make($item, [
                     'item_code' => 'required|string|max:50',
@@ -155,37 +161,39 @@ class InventoryController extends Controller
                     $inventory_item->location = $item['location'];
                     $inventory_item->remark = $item['remark'];
                     $inventory_item->save();
-                    $this->passed($item['item_code'] . ' item added to the inventory');
+                    $this->passed($item['item_code'].' item added to the inventory');
                     array_push($item_code_list, $item['item_code']);
                 } catch (\Throwable $th) {
                     DB::rollBack();
                     $this->failed($th);
+
                     return back()->withErrors('Something went wrong. Please check the data again.');
                 }
             }
             DB::commit();
+
             return view('dmiesys.laboratories.inventory-qr-codes', compact('item_code_list'));
         }
+
         return back();
     }
 
     /**
      * Display the specified resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function create()
     {
         abort_unless(($this->can('add inventory')), 404);
+
         return view('dmiesys.laboratories.add-item-to-inventory');
     }
-
 
     /**
      * Remove the specified resource from storage.
      *
-     * @param  \App\Models\Inventory  $inventory
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function destroy(Inventory $inventory)
     {
@@ -193,11 +201,13 @@ class InventoryController extends Controller
 
         try {
             $inventory->delete();
-            $this->passed($inventory->item_code . ' Inventory Item was deleted');
-            $this->notifyHOD('Inventory Item was deleted by ' . auth()->user()->name);
-            return back()->with('toast_success', 'Item deleted successfully! <a class="font-semibold underline hover:text-green-800 dark:hover:text-green-900" href="' . route('inventory.restore', $inventory->id) . '">Undo</a>');
+            $this->passed($inventory->item_code.' Inventory Item was deleted');
+            $this->notifyHOD('Inventory Item was deleted by '.auth()->user()->name);
+
+            return back()->with('toast_success', 'Item deleted successfully! <a class="font-semibold underline hover:text-green-800 dark:hover:text-green-900" href="'.route('inventory.restore', $inventory->id).'">Undo</a>');
         } catch (\Throwable $th) {
             $this->failed($th);
+
             return back()->withErrors($th->getMessage());
         }
     }
@@ -205,8 +215,7 @@ class InventoryController extends Controller
     /**
      * Restore the specified resource from storage.
      *
-     * @param  int  $id
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function restore(int $id)
     {
@@ -215,16 +224,15 @@ class InventoryController extends Controller
         if ($item && $item->trashed()) {
             $item->restore();
         }
-        $this->passed($item->item_code . ' Inventory Item was restored');
+        $this->passed($item->item_code.' Inventory Item was restored');
+
         return back();
     }
 
     /**
      * Update the specified resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Inventory  $inventory
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function update(Request $request, Inventory $inventory)
     {
@@ -232,11 +240,12 @@ class InventoryController extends Controller
 
         if ($inventory->image_path) {
             try {
-                if (File::exists(public_path('storage/inventory-item-photos/' . $inventory->image_path))) {
-                    File::delete(public_path('storage/inventory-item-photos/' . $inventory->image_path));
+                if (File::exists(public_path('storage/inventory-item-photos/'.$inventory->image_path))) {
+                    File::delete(public_path('storage/inventory-item-photos/'.$inventory->image_path));
                 }
             } catch (\Throwable $th) {
                 $this->failed($th);
+
                 return back()->withErrors('Something went wrong when uploading the image.');
             }
         }
@@ -247,20 +256,23 @@ class InventoryController extends Controller
 
         try {
             $extention = $request->file('photo')->getClientOriginalExtension();
-            $photoname = md5(Str::random(20)) . '.' . $extention;
-            Image::make($request->file('photo'))->fit(800, 600)->save('storage/inventory-item-photos/' . $photoname);
+            $photoname = md5(Str::random(20)).'.'.$extention;
+            Image::read($request->file('photo'))->cover(800, 600)->save('storage/inventory-item-photos/'.$photoname);
         } catch (\Throwable $th) {
             $this->failed($th);
+
             return back()->withErrors('Something went wrong when uploading the image.');
         }
 
         try {
             $inventory->image_path = $photoname;
             $inventory->save();
-            $this->passed($inventory->item_code . ' Inventory photo updated');
+            $this->passed($inventory->item_code.' Inventory photo updated');
+
             return back()->with('toast_success', 'Image uploaded successfully!');
         } catch (\Throwable $th) {
             $this->failed($th);
+
             return back()->withErrors('Something went wrong when uploading the image.');
         }
     }
@@ -268,8 +280,7 @@ class InventoryController extends Controller
     /**
      * Delete the resource in storage.
      *
-     * @param  int  $id
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function deletePhoto(int $id)
     {
@@ -279,18 +290,21 @@ class InventoryController extends Controller
 
         if ($inventory->image_path) {
             try {
-                if (File::exists(config('settings.system.path') . 'storage/inventory-item-photos/' . $inventory->image_path)) {
-                    File::delete(config('settings.system.path') . 'storage/inventory-item-photos/' . $inventory->image_path);
+                if (File::exists(config('settings.system.path').'storage/inventory-item-photos/'.$inventory->image_path)) {
+                    File::delete(config('settings.system.path').'storage/inventory-item-photos/'.$inventory->image_path);
                 }
-                $inventory->image_path = NULL;
+                $inventory->image_path = null;
                 $inventory->save();
-                $this->passed($inventory->item_code . ' Inventory item photo deleted!');
+                $this->passed($inventory->item_code.' Inventory item photo deleted!');
+
                 return back()->with('toast_success', 'Image deleted successfully!');
             } catch (\Throwable $th) {
                 $this->failed($th);
+
                 return back()->withErrors('Something went wrong when uploading the image.');
             }
         }
+
         return back()->withErrors('Something went wrong when uploading the image.');
     }
 }

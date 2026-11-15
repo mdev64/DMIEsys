@@ -53,7 +53,7 @@ function setTheme(theme) {
     if (theme == 'dark') {
         if (!document.body.classList.contains('dark')) document.body.classList.add('dark');
         document.body.style.backgroundColor = 'black';
-        if (dark_mode_btn.classList.contains('bi-sun-fill')) {
+        if (dark_mode_btn && dark_mode_btn.classList.contains('bi-sun-fill')) {
             dark_mode_btn.classList.remove('bi-sun-fill');
             dark_mode_btn.classList.add('bi-moon-stars-fill');
         }
@@ -62,7 +62,7 @@ function setTheme(theme) {
     else if (theme == 'light') {
         if (document.body.classList.contains('dark')) document.body.classList.remove('dark');
         document.body.style.backgroundColor = '	#F8F8F8';
-        if (dark_mode_btn.classList.contains('bi-moon-stars-fill')) {
+        if (dark_mode_btn && dark_mode_btn.classList.contains('bi-moon-stars-fill')) {
             dark_mode_btn.classList.remove('bi-moon-stars-fill');
             dark_mode_btn.classList.add('bi-sun-fill');
         }

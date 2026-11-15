@@ -4,18 +4,17 @@ namespace App\Models;
 
 use Cmgmyr\Messenger\Traits\Messagable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
-use Laravel\Jetstream\HasProfilePhoto;
 use Laravel\Sanctum\HasApiTokens;
-use ProtoneMedia\LaravelVerifyNewEmail\MustVerifyNewEmail;
 use Spatie\Permission\Traits\HasRoles;
 use Yadahan\AuthenticationLog\AuthenticationLogable;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, TwoFactorAuthenticatable, AuthenticationLogable, Messagable, HasRoles, MustVerifyNewEmail, HasApiTokens;
+    use AuthenticationLogable, HasApiTokens, HasFactory, HasRoles, Messagable, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -51,13 +50,12 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
     ];
 
-
     public function scopeActive(object $query): object
     {
         return $query->where('active_status', '1')->where('newuser', '0')->where('hidden', '0');
     }
 
-    public function getStudents(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function getStudents(): HasMany
     {
         return $this->hasMany(App\Models\Student::class, 'student_advisor', 'id')->where('graduated', 0);
     }

@@ -16,7 +16,7 @@ function hideMenu() {
 
 function playNotificationSound() {
     document.getElementById("notification_sound").play();
-    window.livewire.emit('updateNotificationBadge');
+    Livewire.dispatch('updateNotificationBadge');
 }
 
 function playMessageSound() {
@@ -29,6 +29,6 @@ function playSentSound() {
 
 // Auto reload widgets
 setInterval(function () {
-    window.livewire.emitTo('messages-indicator', 'updateMessageIndicator');
-    window.livewire.emitTo('instant-notification', 'showInstantNotification');
+    Livewire.dispatchTo('messages-indicator', 'updateMessageIndicator');
+    Livewire.dispatchTo('instant-notification', 'showInstantNotification');
 }, 10000);

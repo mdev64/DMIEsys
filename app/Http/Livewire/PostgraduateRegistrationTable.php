@@ -4,16 +4,23 @@ namespace App\Http\Livewire;
 
 use App\Models\PostgraduateRegistration;
 use App\Traits\System;
-use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
-use PowerComponents\LivewirePowerGrid\Rules\{Rule, RuleActions};
-use PowerComponents\LivewirePowerGrid\Traits\ActionButton;
-use PowerComponents\LivewirePowerGrid\{Button, Column, Exportable, Footer, Header, PowerGrid, PowerGridComponent, PowerGridEloquent};
+use Illuminate\Support\Carbon;
+use PowerComponents\LivewirePowerGrid\Button;
+use PowerComponents\LivewirePowerGrid\Column;
+use PowerComponents\LivewirePowerGrid\Components\SetUp\Exportable;
+use PowerComponents\LivewirePowerGrid\Facades\Filter;
+use PowerComponents\LivewirePowerGrid\Facades\PowerGrid;
+use PowerComponents\LivewirePowerGrid\PowerGridComponent;
+use PowerComponents\LivewirePowerGrid\PowerGridFields;
+use PowerComponents\LivewirePowerGrid\Traits\WithExport;
 
 final class PostgraduateRegistrationTable extends PowerGridComponent
 {
-    use ActionButton, System;
+    use System, WithExport;
+
+    public string $tableName = 'postgraduate_registration_table';
 
     /*
     |--------------------------------------------------------------------------
@@ -27,11 +34,14 @@ final class PostgraduateRegistrationTable extends PowerGridComponent
         $this->showCheckBox()->persist(['columns', 'filters']);
 
         return [
-            Exportable::make('PG Registration ' . now()->toDateString(), ['excel', 'csv'])
+            PowerGrid::exportable('PG Registration '.now()->toDateString())
                 ->striped()
-                ->type(Exportable::TYPE_XLS, Exportable::TYPE_CSV),
-            Header::make()->showSearchInput()->showToggleColumns(),
-            Footer::make()
+                ->type(Exportable::TYPE_XLS, Exportable::TYPE_CSV)
+                ->stripTags(true),
+            PowerGrid::header()
+                ->showSearchInput()
+                ->showToggleColumns(),
+            PowerGrid::footer()
                 ->showPerPage()
                 ->showRecordCount('full'),
         ];
@@ -45,11 +55,9 @@ final class PostgraduateRegistrationTable extends PowerGridComponent
     |
     */
 
-    /** @var string */
     public string $primaryKey = 'postgraduate_registrations.nic';
-    /** @var string */
-    public string $sortField = 'postgraduate_registrations.nic';
 
+    public string $sortField = 'postgraduate_registrations.nic';
 
     public function datasource(): ?Builder
     {
@@ -76,172 +84,216 @@ final class PostgraduateRegistrationTable extends PowerGridComponent
     | You can pass a closure to transform/modify the data.
     |
     */
-    public function addColumns(): PowerGridEloquent
+    public function fields(): PowerGridFields
     {
-        return PowerGrid::eloquent()
-            ->addColumn('nic')
-            ->addColumn('applied_degree', function (PostgraduateRegistration $model) {
-                if ($model->applied_degree == 'Postgraduate Programme in Engineering Management') return 'Engineering Management';
-                if ($model->applied_degree == 'Postgraduate Programme in Manufacturing Engineering') return 'Manufacturing Engineering';
+        return PowerGrid::fields()
+            ->add('nic')
+            ->add('applied_degree', function (PostgraduateRegistration $model) {
+                if ($model->applied_degree == 'Postgraduate Programme in Engineering Management') {
+                    return 'Engineering Management';
+                }
+                if ($model->applied_degree == 'Postgraduate Programme in Manufacturing Engineering') {
+                    return 'Manufacturing Engineering';
+                }
             })
-            ->addColumn('degree_cat', function (PostgraduateRegistration $model) {
-                if ($model->degree_cat == 'Postgraduate Diploma (PG Dip)') return 'PG Dip';
-                if ($model->degree_cat == 'Master of Science (MSc)') return 'MSc';
-                if ($model->degree_cat == 'Master of Science of Engineering (MSc Eng)') return 'MSc Eng';
+            ->add('degree_cat', function (PostgraduateRegistration $model) {
+                if ($model->degree_cat == 'Postgraduate Diploma (PG Dip)') {
+                    return 'PG Dip';
+                }
+                if ($model->degree_cat == 'Master of Science (MSc)') {
+                    return 'MSc';
+                }
+                if ($model->degree_cat == 'Master of Science of Engineering (MSc Eng)') {
+                    return 'MSc Eng';
+                }
             })
-            ->addColumn('fname')
-            ->addColumn('lname')
-            ->addColumn('fullname')
-            ->addColumn('email')
-            ->addColumn('phone')
-            ->addColumn('birthday_formatted', function (PostgraduateRegistration $model) {
+            ->add('fname')
+            ->add('lname')
+            ->add('fullname')
+            ->add('email')
+            ->add('phone')
+            ->add('birthday_formatted', function (PostgraduateRegistration $model) {
                 return Carbon::parse($model->birthday)->format('d/m/Y');
             })
-            ->addColumn('gender')
-            ->addColumn('address')
-            ->addColumn('employment')
-            ->addColumn('noofuniversities')
-            ->addColumn('noofcompanies')
-            ->addColumn('noofmemberships')
-            ->addColumn('year_formatted', function (PostgraduateRegistration $model) {
+            ->add('gender')
+            ->add('address')
+            ->add('employment')
+            ->add('noofuniversities')
+            ->add('noofcompanies')
+            ->add('noofmemberships')
+            ->add('year_formatted', function (PostgraduateRegistration $model) {
                 return Carbon::parse($model->year)->format('Y');
             })
-            ->addColumn('file_path')
-            ->addColumn('r1_is_submit', function (PostgraduateRegistration $model) {
-                if ($model->r1_is_submit) return 'Submitted';
-                else return 'Not Submit';
+            ->add('file_path')
+            ->add('r1_is_submit', function (PostgraduateRegistration $model) {
+                if ($model->r1_is_submit) {
+                    return 'Submitted';
+                } else {
+                    return 'Not Submit';
+                }
             })
-            ->addColumn('r2_is_submit', function (PostgraduateRegistration $model) {
-                if ($model->r2_is_submit) return 'Submitted';
-                else return 'Not Submit';
+            ->add('r2_is_submit', function (PostgraduateRegistration $model) {
+                if ($model->r2_is_submit) {
+                    return 'Submitted';
+                } else {
+                    return 'Not Submit';
+                }
             })
-            ->addColumn('ip')
-            ->addColumn('random_phase')
-            ->addColumn('created_at_formatted', function (PostgraduateRegistration $model) {
+            ->add('ip')
+            ->add('random_phase')
+            ->add('created_at_formatted', function (PostgraduateRegistration $model) {
                 return Carbon::parse($model->created_at)->format('d/m/Y');
             })
-            ->addColumn('updated_at_formatted', function (PostgraduateRegistration $model) {
+            ->add('updated_at_formatted', function (PostgraduateRegistration $model) {
                 return Carbon::parse($model->updated_at)->format('d/m/Y H:i:s');
             })
-            ->addColumn('degree1', function (PostgraduateRegistration $model) {
-                if ($model->noofuniversities >= 1)
-                    return $model->getUniversity[0]->degreetype .
-                        ', ' . $model->getUniversity[0]->university .
-                        ', ' . $model->getUniversity[0]->specification .
-                        ', ' . $model->getUniversity[0]->year .
-                        ', ' . $model->getUniversity[0]->class .
-                        ', ' . $model->getUniversity[0]->credits;
-                else return '-';
+            ->add('degree1', function (PostgraduateRegistration $model) {
+                if ($model->noofuniversities >= 1) {
+                    return $model->getUniversity[0]->degreetype.
+                        ', '.$model->getUniversity[0]->university.
+                        ', '.$model->getUniversity[0]->specification.
+                        ', '.$model->getUniversity[0]->year.
+                        ', '.$model->getUniversity[0]->class.
+                        ', '.$model->getUniversity[0]->credits;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('degree2', function (PostgraduateRegistration $model) {
-                if ($model->noofuniversities >= 2)
-                    return $model->getUniversity[1]->degreetype .
-                        ', ' . $model->getUniversity[1]->university .
-                        ', ' . $model->getUniversity[1]->specification .
-                        ', ' . $model->getUniversity[1]->year .
-                        ', ' . $model->getUniversity[1]->class .
-                        ', ' . $model->getUniversity[1]->credits;
-                else return '-';
+            ->add('degree2', function (PostgraduateRegistration $model) {
+                if ($model->noofuniversities >= 2) {
+                    return $model->getUniversity[1]->degreetype.
+                        ', '.$model->getUniversity[1]->university.
+                        ', '.$model->getUniversity[1]->specification.
+                        ', '.$model->getUniversity[1]->year.
+                        ', '.$model->getUniversity[1]->class.
+                        ', '.$model->getUniversity[1]->credits;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('degree3', function (PostgraduateRegistration $model) {
-                if ($model->noofuniversities >= 3)
-                    return $model->getUniversity[2]->degreetype .
-                        ', ' . $model->getUniversity[2]->university .
-                        ', ' . $model->getUniversity[2]->specification .
-                        ', ' . $model->getUniversity[2]->year .
-                        ', ' . $model->getUniversity[2]->class .
-                        ', ' . $model->getUniversity[2]->credits;
-                else return '-';
+            ->add('degree3', function (PostgraduateRegistration $model) {
+                if ($model->noofuniversities >= 3) {
+                    return $model->getUniversity[2]->degreetype.
+                        ', '.$model->getUniversity[2]->university.
+                        ', '.$model->getUniversity[2]->specification.
+                        ', '.$model->getUniversity[2]->year.
+                        ', '.$model->getUniversity[2]->class.
+                        ', '.$model->getUniversity[2]->credits;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('degree4', function (PostgraduateRegistration $model) {
-                if ($model->noofuniversities >= 4)
-                    return $model->getUniversity[3]->degreetype .
-                        ', ' . $model->getUniversity[3]->university .
-                        ', ' . $model->getUniversity[3]->specification .
-                        ', ' . $model->getUniversity[3]->year .
-                        ', ' . $model->getUniversity[3]->class .
-                        ', ' . $model->getUniversity[3]->credits;
-                else return '-';
+            ->add('degree4', function (PostgraduateRegistration $model) {
+                if ($model->noofuniversities >= 4) {
+                    return $model->getUniversity[3]->degreetype.
+                        ', '.$model->getUniversity[3]->university.
+                        ', '.$model->getUniversity[3]->specification.
+                        ', '.$model->getUniversity[3]->year.
+                        ', '.$model->getUniversity[3]->class.
+                        ', '.$model->getUniversity[3]->credits;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('company1', function (PostgraduateRegistration $model) {
-                if ($model->noofcompanies >= 1)
-                    return $model->getCompany[0]->position .
-                        ', ' .  $model->getCompany[0]->employer .
-                        ', ' .  $model->getCompany[0]->period;
-                else return '-';
+            ->add('company1', function (PostgraduateRegistration $model) {
+                if ($model->noofcompanies >= 1) {
+                    return $model->getCompany[0]->position.
+                        ', '.$model->getCompany[0]->employer.
+                        ', '.$model->getCompany[0]->period;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('company2', function (PostgraduateRegistration $model) {
-                if ($model->noofcompanies >= 2)
-                    return $model->getCompany[1]->position .
-                        ', ' .  $model->getCompany[1]->employer .
-                        ', ' .  $model->getCompany[1]->period;
-                else return '-';
+            ->add('company2', function (PostgraduateRegistration $model) {
+                if ($model->noofcompanies >= 2) {
+                    return $model->getCompany[1]->position.
+                        ', '.$model->getCompany[1]->employer.
+                        ', '.$model->getCompany[1]->period;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('company3', function (PostgraduateRegistration $model) {
-                if ($model->noofcompanies >= 3)
-                    return $model->getCompany[2]->position .
-                        ', ' .  $model->getCompany[2]->employer .
-                        ', ' .  $model->getCompany[2]->period;
-                else return '-';
+            ->add('company3', function (PostgraduateRegistration $model) {
+                if ($model->noofcompanies >= 3) {
+                    return $model->getCompany[2]->position.
+                        ', '.$model->getCompany[2]->employer.
+                        ', '.$model->getCompany[2]->period;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('company4', function (PostgraduateRegistration $model) {
-                if ($model->noofcompanies >= 4)
-                    return $model->getCompany[3]->position .
-                        ', ' .  $model->getCompany[3]->employer .
-                        ', ' .  $model->getCompany[3]->period;
-                else return '-';
+            ->add('company4', function (PostgraduateRegistration $model) {
+                if ($model->noofcompanies >= 4) {
+                    return $model->getCompany[3]->position.
+                        ', '.$model->getCompany[3]->employer.
+                        ', '.$model->getCompany[3]->period;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('company5', function (PostgraduateRegistration $model) {
-                if ($model->noofcompanies >= 5)
-                    return $model->getCompany[4]->position .
-                        ', ' .  $model->getCompany[4]->employer .
-                        ', ' .  $model->getCompany[4]->period;
-                else return '-';
+            ->add('company5', function (PostgraduateRegistration $model) {
+                if ($model->noofcompanies >= 5) {
+                    return $model->getCompany[4]->position.
+                        ', '.$model->getCompany[4]->employer.
+                        ', '.$model->getCompany[4]->period;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('membership1', function (PostgraduateRegistration $model) {
-                if ($model->noofmemberships >= 1)
-                    return $model->getMembership[0]->membershipcat .
-                        ', ' .  $model->getMembership[0]->organization .
-                        ', ' .  $model->getMembership[0]->membershipno;
-                else return '-';
+            ->add('membership1', function (PostgraduateRegistration $model) {
+                if ($model->noofmemberships >= 1) {
+                    return $model->getMembership[0]->membershipcat.
+                        ', '.$model->getMembership[0]->organization.
+                        ', '.$model->getMembership[0]->membershipno;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('membership2', function (PostgraduateRegistration $model) {
-                if ($model->noofmemberships >= 2)
-                    return $model->getMembership[1]->membershipcat .
-                        ', ' .  $model->getMembership[1]->organization .
-                        ', ' .  $model->getMembership[1]->membershipno;
-                else return '-';
+            ->add('membership2', function (PostgraduateRegistration $model) {
+                if ($model->noofmemberships >= 2) {
+                    return $model->getMembership[1]->membershipcat.
+                        ', '.$model->getMembership[1]->organization.
+                        ', '.$model->getMembership[1]->membershipno;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('membership3', function (PostgraduateRegistration $model) {
-                if ($model->noofmemberships >= 3)
-                    return $model->getMembership[2]->membershipcat .
-                        ', ' .  $model->getMembership[2]->organization .
-                        ', ' .  $model->getMembership[2]->membershipno;
-                else return '-';
+            ->add('membership3', function (PostgraduateRegistration $model) {
+                if ($model->noofmemberships >= 3) {
+                    return $model->getMembership[2]->membershipcat.
+                        ', '.$model->getMembership[2]->organization.
+                        ', '.$model->getMembership[2]->membershipno;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('membership4', function (PostgraduateRegistration $model) {
-                if ($model->noofmemberships >= 4)
-                    return $model->getMembership[3]->membershipcat .
-                        ', ' .  $model->getMembership[3]->organization .
-                        ', ' .  $model->getMembership[3]->membershipno;
-                else return '-';
+            ->add('membership4', function (PostgraduateRegistration $model) {
+                if ($model->noofmemberships >= 4) {
+                    return $model->getMembership[3]->membershipcat.
+                        ', '.$model->getMembership[3]->organization.
+                        ', '.$model->getMembership[3]->membershipno;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('membership5', function (PostgraduateRegistration $model) {
-                if ($model->noofmemberships >= 5)
-                    return $model->getMembership[4]->membershipcat .
-                        ', ' .  $model->getMembership[4]->organization .
-                        ', ' .  $model->getMembership[4]->membershipno;
-                else return '-';
+            ->add('membership5', function (PostgraduateRegistration $model) {
+                if ($model->noofmemberships >= 5) {
+                    return $model->getMembership[4]->membershipcat.
+                        ', '.$model->getMembership[4]->organization.
+                        ', '.$model->getMembership[4]->membershipno;
+                } else {
+                    return '-';
+                }
             })
-            ->addColumn('referee1', function (PostgraduateRegistration $model) {
-                return $model->getReferee[0]->name .
-                    ', ' .  $model->getReferee[0]->designation .
-                    ', ' .  $model->getReferee[0]->email;
+            ->add('referee1', function (PostgraduateRegistration $model) {
+                return $model->getReferee[0]->name.
+                    ', '.$model->getReferee[0]->designation.
+                    ', '.$model->getReferee[0]->email;
             })
-            ->addColumn('referee2', function (PostgraduateRegistration $model) {
-                return $model->getReferee[1]->name .
-                    ', ' .  $model->getReferee[1]->designation .
-                    ', ' .  $model->getReferee[1]->email;
+            ->add('referee2', function (PostgraduateRegistration $model) {
+                return $model->getReferee[1]->name.
+                    ', '.$model->getReferee[1]->designation.
+                    ', '.$model->getReferee[1]->email;
             });
     }
 
@@ -260,43 +312,37 @@ final class PostgraduateRegistrationTable extends PowerGridComponent
                 ->title(__('NIC'))
                 ->field('nic')
                 ->sortable()
-                ->searchable()
-                ->makeInputRange('price', '.', ','),
+                ->searchable(),
 
             Column::add()
                 ->title(__('APPLIED DEGREE'))
                 ->field('applied_degree')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title(__('DEGREE CAT'))
                 ->field('degree_cat')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title(__('FIRST NAME'))
                 ->field('fname')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title(__('LAST NAME'))
                 ->field('lname')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title(__('FULL NAME'))
                 ->field('fullname')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title(__('EMAIL'))
@@ -341,11 +387,10 @@ final class PostgraduateRegistrationTable extends PowerGridComponent
                 ->title(__('4th DEGREE'))
                 ->field('degree4'),
 
-
             Column::add()
                 ->title(__('EMPLOYMENT'))
                 ->field('employment')
-                ->makeInputSelect(PostgraduateRegistration::all(), 'employment', 'state', ['live-search' => true])
+
                 ->sortable(),
 
             Column::add()
@@ -415,11 +460,11 @@ final class PostgraduateRegistrationTable extends PowerGridComponent
             //     ->field('file_path')
             //     ->sortable()
             //     ->searchable()
-            //     ->makeInputText(),
+            //     ,
 
             Column::add()
                 ->title(__('REFEREE 1'))
-                ->makeBooleanFilter('r1_is_submit', 'Submitted', 'Not Submit')
+
                 ->field('r1_is_submit'),
 
             Column::add()
@@ -428,7 +473,7 @@ final class PostgraduateRegistrationTable extends PowerGridComponent
 
             Column::add()
                 ->title(__('REFEREE 2'))
-                ->makeBooleanFilter('r2_is_submit', 'Submitted', 'Not Submit')
+
                 ->field('r2_is_submit'),
 
             Column::add()
@@ -440,14 +485,14 @@ final class PostgraduateRegistrationTable extends PowerGridComponent
             //     ->field('ip')
             //     ->sortable()
             //     ->searchable()
-            //     ->makeInputText(),
+            //     ,
 
             // Column::add()
             //     ->title(__('RANDOM PHASE'))
             //     ->field('random_phase')
             //     ->sortable()
             //     ->searchable()
-            //     ->makeInputText(),
+            //     ,
 
             Column::add()
                 ->title(__('REGISTERED ON'))
@@ -461,6 +506,26 @@ final class PostgraduateRegistrationTable extends PowerGridComponent
             //     ->sortable()
             //     ->makeInputDatePicker('updated_at'),
 
+        ];
+    }
+
+    public function filters(): array
+    {
+        return [
+            Filter::inputText('nic'),
+            Filter::inputText('applied_degree'),
+            Filter::inputText('degree_cat'),
+            Filter::inputText('fname'),
+            Filter::inputText('lname'),
+            Filter::inputText('fullname'),
+            Filter::select('employment', 'employment')
+                ->dataSource(PostgraduateRegistration::select('employment')->distinct()->get())
+                ->optionLabel('employment')
+                ->optionValue('employment'),
+            Filter::boolean('r1_is_submit')
+                ->label('Submitted', 'Not Submit'),
+            Filter::boolean('r2_is_submit')
+                ->label('Submitted', 'Not Submit'),
         ];
     }
 

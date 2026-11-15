@@ -2,22 +2,30 @@
 
 namespace App\Http\Livewire;
 
+use Illuminate\Notifications\DatabaseNotificationCollection;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class DashboardNotifications extends Component
 {
     /** @var bool */
     public $hasNotifications;
+
     /** @var bool */
     public $hasUnreadNotifications;
+
     /** @var array */
     public $unread_notifications;
+
     /** @var int */
     public $unread_notifications_count = 0;
-    /** @var \Illuminate\Notifications\DatabaseNotificationCollection|null */
+
+    /** @var DatabaseNotificationCollection|null */
     public $all_notifications = null;
+
     /** @var int */
     public $all_notifications_count = 0;
+
     /** @var int */
     public $notificationCount;
 
@@ -32,7 +40,9 @@ class DashboardNotifications extends Component
         $this->hasNotifications = false;
         $this->hasUnreadNotifications = false;
         $this->unread_notifications = auth()->user()->unreadNotifications;
-        if ($this->unread_notifications) $this->unread_notifications_count = $this->unread_notifications->count();
+        if ($this->unread_notifications) {
+            $this->unread_notifications_count = $this->unread_notifications->count();
+        }
         $this->all_notifications = auth()->user()->notifications;
         $this->all_notifications_count = $this->all_notifications->count();
         if ($this->unread_notifications->count()) {
@@ -43,11 +53,11 @@ class DashboardNotifications extends Component
             $this->hasUnreadNotifications = false;
             $this->hasNotifications = true;
         }
-        $this->emit('updateNotificationBadge');
+        $this->dispatch('updateNotificationBadge');
     }
 
     /**
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function render()
     {
@@ -55,7 +65,6 @@ class DashboardNotifications extends Component
     }
 
     /**
-     * @param string $id
      * @return void
      */
     public function MarkAsRead(string $id)
@@ -70,7 +79,6 @@ class DashboardNotifications extends Component
     }
 
     /**
-     * @param string $id
      * @return void
      */
     public function Delete(string $id)

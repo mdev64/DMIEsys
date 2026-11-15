@@ -1,0 +1,16 @@
+{
+    "agents": [
+        "claude_code",
+        "copilot",
+        "gemini"
+    ],
+    "editors": [
+        "claude_code",
+        "gemini",
+        "vscode"
+    ],
+    "guidelines": [
+        "realrashid/sweet-alert"
+    ],
+    "herd_mcp": true
+}

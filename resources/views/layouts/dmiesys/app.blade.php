@@ -41,9 +41,9 @@
     </div>
 
     @stack('scripts', '')
-    <script src="{{ asset('src/js/toggle-dark-mode.js') }}"></script>
+    <script src="{{ asset('src/js/toggle-dark-mode.js') }}?v=2"></script>
     @auth
-    <script src="{{ asset('src/js/script.js') }}"></script>
+    <script src="{{ asset('src/js/script.js') }}?v=3"></script>
     @include('sweetalert::alert')
     @can('see notification')
     @livewire('instant-notification')

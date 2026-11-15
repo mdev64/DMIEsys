@@ -3,6 +3,6 @@
     <p class="text-md text-center font-light mb-5 text-gray-600 dark:text-gray-400">You're logged as: {{
         auth()->user()->username }} |
         Authorization
-        level: {{ auth()->user()->getRoleNames()[0] }}
+        level: {{ auth()->user()->getRoleNames()->first() ?? 'No Role' }}
     </p>
 </div>

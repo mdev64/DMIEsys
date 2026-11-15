@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Wildside\Userstamps\Userstamps;
+use Mattiverse\Userstamps\Traits\Userstamps;
 
 class GeneralCourse extends Model
 {
@@ -12,7 +12,10 @@ class GeneralCourse extends Model
     use Userstamps;
 
     protected $primaryKey = 'course_code';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
+
     protected $guarded = [];
 }

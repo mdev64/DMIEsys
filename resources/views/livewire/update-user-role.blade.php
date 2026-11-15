@@ -13,7 +13,7 @@
                     <option value="{{ null }}" selected>-- Select a user --</option>
                     @foreach ($activeusers as $usr)
                     <option value="{{ $usr->id }}">{{ $usr->title }} {{ $usr->name }}
-                        ({{ $usr->getRoleNames()[0] }})
+                        ({{ $usr->getRoleNames()->first() ?? 'No Role' }})
                     </option>
                     @endforeach
                 </select>

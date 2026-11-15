@@ -9,7 +9,7 @@
 
             <div class="col-md-12 mb-4 mt-4">
                 <label for="role" class="form-label">Select a Role</label>
-                <select id="role" class="form-select w-full" wire:model="role" required>
+                <select id="role" class="form-select w-full" wire:model.live="role" required>
                     <option value="{{ null }}" selected>-- Select a role --</option>
                     @foreach ($all_roles as $all_role)
                         <option value="{{ $all_role->id }}">{{ $all_role->name }}</option>
@@ -19,17 +19,57 @@
 
 
             @if ($selectRole)
-                <div class="grid 2xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2 pl-5 mb-5">
-                    @foreach ($permissions as $permission)
-                        <div>
-                            <input class="form-check" type="checkbox" value="{{ $permission->name }}"
-                                @if ($selectRole->hasPermissionTo($permission->name)) checked @endif
-                                wire:click="SetPermissionForRole('{{ $permission->name }}')"
-                                id="checkbox_{{ $loop->index }}">
-                            <label class="form-check-label" for="checkbox_{{ $loop->index }}">
-                                {{ $permission->name }}
-                            </label>
-                        </div>
+                <div class="space-y-4 mb-6">
+                    @foreach ($grouped_permissions as $group => $groupPerms)
+                        @if (count($groupPerms) > 0)
+                            @php
+                                $groupStyle = $this->getGroupStyle($group);
+                            @endphp
+                            <div class="p-4 rounded-xl border {{ $groupStyle['bg'] }} {{ $groupStyle['border'] }} shadow-sm">
+                                <div class="flex items-center justify-between mb-3 border-b border-gray-200/50 dark:border-gray-700/50 pb-2">
+                                    <div class="flex items-center space-x-2">
+                                        <i class="bi {{ $groupStyle['icon'] }} text-lg"></i>
+                                        <span class="text-sm font-semibold {{ $groupStyle['text'] }}">{{ $groupStyle['name'] }}</span>
+                                    </div>
+                                    <button type="button" 
+                                            wire:click="toggleGroupPermissionsForRole('{{ $group }}')"
+                                            class="text-xs px-2.5 py-1 rounded-lg border {{ $groupStyle['border'] }} hover:bg-white dark:hover:bg-gray-800 transition duration-150 ease-in-out font-medium {{ $groupStyle['text'] }} shadow-sm">
+                                        Toggle All
+                                    </button>
+                                </div>
+                                <div class="grid 2xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2 gap-y-3 gap-x-4 pl-2">
+                                    @foreach ($groupPerms as $permission)
+                                        <div class="flex items-center space-x-1.5 min-h-[1.5rem]">
+                                            <input class="form-check cursor-pointer" type="checkbox" value="{{ $permission->name }}"
+                                                @if ($selectRole->hasPermissionTo($permission->name)) checked @endif
+                                                wire:click="SetPermissionForRole('{{ $permission->name }}')"
+                                                id="checkbox_role_{{ $group }}_{{ $loop->index }}">
+                                            <label class="form-check-label flex items-center cursor-pointer select-none text-gray-700 dark:text-gray-300" for="checkbox_role_{{ $group }}_{{ $loop->index }}">
+                                                <span>{{ $permission->name }}</span>
+                                            </label>
+                                            <div x-data="{ open: false }" class="relative inline-flex items-center">
+                                                <button type="button" @mouseenter="open = true" @mouseleave="open = false" @focus="open = true" @blur="open = false" class="focus:outline-none text-gray-400 hover:text-blue-600 transition-colors duration-150">
+                                                    <i class="bi bi-info-circle text-xs cursor-help"></i>
+                                                </button>
+                                                <div x-show="open" 
+                                                     x-transition:enter="transition ease-out duration-200"
+                                                     x-transition:enter-start="opacity-0 translate-y-1"
+                                                     x-transition:enter-end="opacity-100 translate-y-0"
+                                                     x-transition:leave="transition ease-in duration-150"
+                                                     x-transition:leave-start="opacity-100 translate-y-0"
+                                                     x-transition:leave-end="opacity-0 translate-y-1"
+                                                     class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2.5 bg-gray-950/95 dark:bg-gray-900/95 backdrop-blur-sm text-white text-xs font-normal rounded-xl shadow-xl z-50 border border-gray-800 pointer-events-none"
+                                                     style="display: none;">
+                                                    <div class="font-semibold text-blue-400 mb-1 capitalize">{{ str_replace(' ', ' ', $permission->name) }}</div>
+                                                    <div class="text-gray-300">{{ $this->getPermissionDescription($permission->name) }}</div>
+                                                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-950/95 dark:border-t-gray-900/95"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     @endforeach
                 </div>
             @endif
@@ -39,11 +79,11 @@
 
             <div class="col-md-12 mb-3 mt-4">
                 <label for="user" class="form-label">Select a User</label>
-                <select id="user" class="form-select w-full" wire:model="user" required>
+                <select id="user" class="form-select w-full" wire:model.live="user" required>
                     <option value="{{ null }}" selected>-- Select a user --</option>
                     @foreach ($all_users as $all_user)
                         <option value="{{ $all_user->id }}">{{ $all_user->name }}
-                            ({{ $all_user->getRoleNames()[0] }})
+                            ({{ $all_user->getRoleNames()->first() ?? 'No Role' }})
                         </option>
                     @endforeach
                 </select>
@@ -57,20 +97,60 @@
                     <span class="block sm:inline">You can't remove the permissions which are assigned to the
                         user by their Role. They are colored in gray.</span>
                 </div>
-                <div class="grid 2xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2 pl-5 mb-5">
-                    @foreach ($permissions as $permission)
-                        <div>
-                            <input
-                                class="form-check @if (!$selectUser->hasDirectPermission($permission->name)) checked:bg-gray-400 dark:checked:bg-gray-400 @else @endif"
-                                type="checkbox" value="{{ $permission->name }}"
-                                @if ($selectUser->hasPermissionTo($permission->name)) checked @if (!$selectUser->hasDirectPermission($permission->name)) disabled @endif
-                                @endif
-                            wire:click="SetPermissionForUser('{{ $permission->name }}')"
-                            id="checkbox_{{ $loop->index }}">
-                            <label class="form-check-label" for="checkbox_{{ $loop->index }}">
-                                {{ $permission->name }}
-                            </label>
-                        </div>
+                <div class="space-y-4 mb-6">
+                    @foreach ($grouped_permissions as $group => $groupPerms)
+                        @if (count($groupPerms) > 0)
+                            @php
+                                $groupStyle = $this->getGroupStyle($group);
+                            @endphp
+                            <div class="p-4 rounded-xl border {{ $groupStyle['bg'] }} {{ $groupStyle['border'] }} shadow-sm">
+                                <div class="flex items-center justify-between mb-3 border-b border-gray-200/50 dark:border-gray-700/50 pb-2">
+                                    <div class="flex items-center space-x-2">
+                                        <i class="bi {{ $groupStyle['icon'] }} text-lg"></i>
+                                        <span class="text-sm font-semibold {{ $groupStyle['text'] }}">{{ $groupStyle['name'] }}</span>
+                                    </div>
+                                    <button type="button" 
+                                            wire:click="toggleGroupPermissionsForUser('{{ $group }}')"
+                                            class="text-xs px-2.5 py-1 rounded-lg border {{ $groupStyle['border'] }} hover:bg-white dark:hover:bg-gray-800 transition duration-150 ease-in-out font-medium {{ $groupStyle['text'] }} shadow-sm">
+                                        Toggle All
+                                    </button>
+                                </div>
+                                <div class="grid 2xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2 gap-y-3 gap-x-4 pl-2">
+                                    @foreach ($groupPerms as $permission)
+                                        <div class="flex items-center space-x-1.5 min-h-[1.5rem]">
+                                            <input
+                                                class="form-check cursor-pointer @if (!$selectUser->hasDirectPermission($permission->name)) checked:bg-gray-400 dark:checked:bg-gray-400 @else @endif"
+                                                type="checkbox" value="{{ $permission->name }}"
+                                                @if ($selectUser->hasPermissionTo($permission->name)) checked @if (!$selectUser->hasDirectPermission($permission->name)) disabled @endif
+                                                @endif
+                                                wire:click="SetPermissionForUser('{{ $permission->name }}')"
+                                                id="checkbox_user_{{ $group }}_{{ $loop->index }}">
+                                            <label class="form-check-label flex items-center cursor-pointer select-none @if (!$selectUser->hasDirectPermission($permission->name) && $selectUser->hasPermissionTo($permission->name)) text-gray-400 @else text-gray-700 dark:text-gray-300 @endif" for="checkbox_user_{{ $group }}_{{ $loop->index }}">
+                                                <span>{{ $permission->name }}</span>
+                                            </label>
+                                            <div x-data="{ open: false }" class="relative inline-flex items-center">
+                                                <button type="button" @mouseenter="open = true" @mouseleave="open = false" @focus="open = true" @blur="open = false" class="focus:outline-none text-gray-400 hover:text-blue-600 transition-colors duration-150">
+                                                    <i class="bi bi-info-circle text-xs cursor-help"></i>
+                                                </button>
+                                                <div x-show="open" 
+                                                     x-transition:enter="transition ease-out duration-200"
+                                                     x-transition:enter-start="opacity-0 translate-y-1"
+                                                     x-transition:enter-end="opacity-100 translate-y-0"
+                                                     x-transition:leave="transition ease-in duration-150"
+                                                     x-transition:leave-start="opacity-100 translate-y-0"
+                                                     x-transition:leave-end="opacity-0 translate-y-1"
+                                                     class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2.5 bg-gray-950/95 dark:bg-gray-900/95 backdrop-blur-sm text-white text-xs font-normal rounded-xl shadow-xl z-50 border border-gray-800 pointer-events-none"
+                                                     style="display: none;">
+                                                    <div class="font-semibold text-blue-400 mb-1 capitalize">{{ str_replace(' ', ' ', $permission->name) }}</div>
+                                                    <div class="text-gray-300">{{ $this->getPermissionDescription($permission->name) }}</div>
+                                                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-950/95 dark:border-t-gray-900/95"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     @endforeach
                 </div>
             @endif
@@ -122,10 +202,10 @@
                                     </div>
                                 </td>
                                 <td class="p-2 whitespace-nowrap">
-                                    <div class="text-left flex flex-wrap">
+                                    <div class="text-left flex flex-wrap gap-y-1">
                                         @forelse ($role->getAllPermissions() as $p)
                                             <div
-                                                class="bg-purple-100 text-purple-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-purple-200 dark:text-purple-900 cursor-default">
+                                                class="{{ $this->getPermissionBadgeStyle($p->name) }} text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full cursor-default uppercase tracking-wider">
                                                 {{ $p->name }}</div>
                                         @empty
                                             <div class="italic text-gray-500 text-sm">(no permissions yet)</div>

@@ -3,20 +3,32 @@
 namespace App\Http\Livewire;
 
 use App\Models\Inventory;
+use App\Models\User;
+use App\Notifications\GeneralNotificationJust;
 use App\Traits\System;
-use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
-use PowerComponents\LivewirePowerGrid\Rules\{Rule, RuleActions};
-use PowerComponents\LivewirePowerGrid\Traits\ActionButton;
-use PowerComponents\LivewirePowerGrid\{Button, Column, Exportable, Footer, Header, PowerGrid, PowerGridComponent, PowerGridEloquent};
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
+use Livewire\Attributes\On;
+use PowerComponents\LivewirePowerGrid\Button;
+use PowerComponents\LivewirePowerGrid\Column;
+use PowerComponents\LivewirePowerGrid\Components\SetUp\Exportable;
+use PowerComponents\LivewirePowerGrid\Facades\Filter;
+use PowerComponents\LivewirePowerGrid\Facades\PowerGrid;
+use PowerComponents\LivewirePowerGrid\Facades\Rule;
+use PowerComponents\LivewirePowerGrid\PowerGridComponent;
+use PowerComponents\LivewirePowerGrid\PowerGridFields;
+use PowerComponents\LivewirePowerGrid\Traits\WithExport;
 
 final class InventoryTable extends PowerGridComponent
 {
-    use ActionButton, System;
+    use System, WithExport;
 
-    /** @var bool */
+    public string $tableName = 'inventory_table';
+
     public bool $showUpdateMessages = true;
+
     /** @var string|null */
     public $itemCode = null;
 
@@ -32,13 +44,16 @@ final class InventoryTable extends PowerGridComponent
         $this->showCheckBox()->persist(['columns', 'filters']);
 
         return [
-            Exportable::make('Inventory List')
+            PowerGrid::exportable('Inventory List')
                 ->striped()
-                ->type(Exportable::TYPE_XLS, Exportable::TYPE_CSV),
-            Header::make()->showSearchInput()->showToggleColumns(),
-            Footer::make()
+                ->type(Exportable::TYPE_XLS, Exportable::TYPE_CSV)
+                ->stripTags(true),
+            PowerGrid::header()
+                ->showSearchInput()
+                ->showToggleColumns(),
+            PowerGrid::footer()
                 ->showPerPage()
-                ->showRecordCount(),
+                ->showRecordCount('full'),
         ];
     }
 
@@ -53,7 +68,7 @@ final class InventoryTable extends PowerGridComponent
     /**
      * PowerGrid datasource.
      *
-     * @return Builder<\App\Models\Inventory>
+     * @return Builder<Inventory>
      */
     public function datasource(): Builder
     {
@@ -81,7 +96,7 @@ final class InventoryTable extends PowerGridComponent
     public function ShowQR(string $value): void
     {
         $this->itemCode = $value;
-        $this->emit('itemCodeChanged', $this->itemCode);
+        $this->dispatch('itemCodeChanged', $this->itemCode);
     }
 
     /*
@@ -95,37 +110,37 @@ final class InventoryTable extends PowerGridComponent
     |    the database using the `e()` Laravel Helper function.
     |
     */
-    public function addColumns(): PowerGridEloquent
+    public function fields(): PowerGridFields
     {
-        return PowerGrid::eloquent()
-            ->addColumn('item_code')
-            ->addColumn('action_buttons', function (Inventory $model) {
-                return '<div class="flex gap-2"><button wire:click.prefetch="ShowQR(' . "'" . $model->item_code . "'" . ')" type="button" class="btn-sm btn-blue float-right" data-bs-toggle="modal" data-modal-toggle="showQRcode"><i class="bi bi-qr-code"></i></button><a target="_blank" href="' . route('inventory.show', $model->item_code) . '" class="btn-sm btn-green"><i class="bi bi-eye"></i></a></div>';
+        return PowerGrid::fields()
+            ->add('item_code')
+            ->add('action_buttons', function (Inventory $model) {
+                return '<div class="flex gap-2"><button wire:click.prefetch="ShowQR(\''.$model->item_code.'\')" type="button" class="btn-sm btn-blue float-right" data-bs-toggle="modal" data-modal-toggle="showQRcode"><i class="bi bi-qr-code"></i></button><a target="_blank" href="'.route('inventory.show', $model->item_code).'" class="btn-sm btn-green"><i class="bi bi-eye"></i></a></div>';
             })
-            ->addColumn('item_name')
-            ->addColumn('received_date_formatted', function (Inventory $model) {
-                return Carbon::parse($model->received_date)->format('Y-m-d');
+            ->add('item_name')
+            ->add('received_date_formatted', function (Inventory $model) {
+                return Carbon::parse($model->received_date)->format('d/m/Y');
             })
-            ->addColumn('indent_no')
-            ->addColumn('supplier_name')
-            ->addColumn('model')
-            ->addColumn('serial_number')
-            ->addColumn('properties', function (Inventory $model) {
+            ->add('indent_no')
+            ->add('supplier_name')
+            ->add('model')
+            ->add('serial_number')
+            ->add('properties', function (Inventory $model) {
                 return $model->properties;
             })
-            ->addColumn('book_no')
-            ->addColumn('folio_no')
-            ->addColumn('value', function (Inventory $model) {
-                return ('Rs. ' . $model->value);
+            ->add('book_no')
+            ->add('folio_no')
+            ->add('value', function (Inventory $model) {
+                return 'Rs. '.$model->value;
             })
-            ->addColumn('budget_allocation')
-            ->addColumn('location')
-            ->addColumn('remark')
-            ->addColumn('created_at_formatted', function (Inventory $model) {
-                return Carbon::parse($model->created_at)->format('Y-m-d');
+            ->add('budget_allocation')
+            ->add('location')
+            ->add('remark')
+            ->add('created_at_formatted', function (Inventory $model) {
+                return Carbon::parse($model->created_at)->format('d/m/Y H:i:s');
             })
-            ->addColumn('updated_at_formatted', function (Inventory $model) {
-                return Carbon::parse($model->updated_at)->format('Y-m-d');
+            ->add('updated_at_formatted', function (Inventory $model) {
+                return Carbon::parse($model->updated_at)->format('d/m/Y H:i:s');
             });
     }
 
@@ -151,66 +166,58 @@ final class InventoryTable extends PowerGridComponent
                 ->title('ITEM CODE')
                 ->field('item_code')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title('INFO')
-                ->field('action_buttons'),
+                ->field('action_buttons')
+                ->visibleInExport(false),
 
             Column::add()
                 ->title('ITEM NAME')
                 ->field('item_name')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title('RECEIVED DATE')
                 ->field('received_date_formatted', 'received_date')
                 ->searchable()
-                ->sortable()
-                ->makeInputDatePicker('received_date'),
+                ->sortable(),
 
             Column::add()
                 ->title('INDENT No.')
                 ->field('indent_no')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title('SUPPLIER NAME')
                 ->field('supplier_name')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title('MODEL')
                 ->field('model')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title('SERIAL NUMBER')
                 ->field('serial_number')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title('BOOK NO')
                 ->field('book_no')
-                ->editOnClick($this->can('edit inventory'))
-                ->makeInputRange(),
+                ->editOnClick($this->can('edit inventory')),
 
             Column::add()
                 ->title('FOLIO NO')
                 ->field('folio_no')
-                ->editOnClick($this->can('edit inventory'))
-                ->makeInputRange(),
+                ->editOnClick($this->can('edit inventory')),
 
             Column::add()
                 ->title('PROPERTIES')
@@ -220,23 +227,20 @@ final class InventoryTable extends PowerGridComponent
 
             Column::add()
                 ->title('VALUE')
-                ->field('value')
-                ->makeInputRange(),
+                ->field('value'),
 
             Column::add()
                 ->title('BUDGET ALLOCATION')
                 ->field('budget_allocation')
                 ->sortable()
-                ->searchable()
-                ->makeInputText(),
+                ->searchable(),
 
             Column::add()
                 ->title('LOCATION')
                 ->field('location')
                 ->sortable()
                 ->searchable()
-                ->editOnClick($this->can('edit inventory'))
-                ->makeInputText(),
+                ->editOnClick($this->can('edit inventory')),
 
             Column::add()
                 ->title('REMARK')
@@ -249,16 +253,35 @@ final class InventoryTable extends PowerGridComponent
                 ->title('CREATED AT')
                 ->field('created_at_formatted', 'created_at')
                 ->searchable()
-                ->sortable()
-                ->makeInputDatePicker('created_at'),
+                ->sortable(),
 
             Column::add()
                 ->title('UPDATED AT')
                 ->field('updated_at_formatted', 'updated_at')
                 ->searchable()
-                ->sortable()
-                ->makeInputDatePicker('updated_at'),
+                ->sortable(),
 
+            Column::action('Action'),
+        ];
+    }
+
+    public function filters(): array
+    {
+        return [
+            Filter::inputText('item_code'),
+            Filter::inputText('item_name'),
+            Filter::datepicker('received_date'),
+            Filter::inputText('indent_no'),
+            Filter::inputText('supplier_name'),
+            Filter::inputText('model'),
+            Filter::inputText('serial_number'),
+            Filter::number('book_no'),
+            Filter::number('folio_no'),
+            Filter::number('value'),
+            Filter::inputText('budget_allocation'),
+            Filter::inputText('location'),
+            Filter::datepicker('created_at'),
+            Filter::datepicker('updated_at'),
         ];
     }
 
@@ -275,73 +298,64 @@ final class InventoryTable extends PowerGridComponent
      *
      * @return array<int, Button>
      */
-
-
-    public function actions(): array
+    public function actions(Inventory $row): array
     {
         return [
             Button::add('delete-item')
-                ->target('')
-                ->caption('Delete')
+                ->slot('Delete')
                 ->class('btn-sm btn-red')
-                ->route('inventory.destroy', ['inventory' => 'id'])
-                ->method('delete'),
+                ->dispatch('delete-item', ['id' => $row->id]),
         ];
     }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Actions Rules
-    |--------------------------------------------------------------------------
-    | Enable the method below to configure Rules for your Table and Action Buttons.
-    |
-    */
 
     /**
      * PowerGrid Inventory Action Rules.
      *
      * @return array<int, RuleActions>
      */
-
-
     public function actionRules(): array
     {
         return [
             Rule::button('delete-item')
-                ->when(fn ($item) => !$this->can('delete inventory'))
-                ->hide()
+                ->when(fn ($item) => ! $this->can('delete inventory'))
+                ->hide(),
         ];
     }
 
-    public function update(array $data): bool
+    public function onUpdatedEditable(string|int $id, string $field, string $value): void
     {
         try {
-            $updated = Inventory::query()->findOrFail($data['id'])
+            Inventory::query()->findOrFail($id)
                 ->update([
-                    $data['field'] => $data['value'],
+                    $field => $value,
                 ]);
         } catch (QueryException $exception) {
-            $updated = false;
+            //
         }
-        return $updated;
     }
 
-    public function updateMessages(string $status = 'error', string $field = '_default_message'): string
+    #[On('delete-item')]
+    public function deleteItem(int $id)
     {
-        $updateMessages = [
-            'success'   => [
-                '_default_message' => __('Data has been updated successfully!'),
-                //'custom_field'   => __('Custom Field updated successfully!'),
-            ],
-            'error' => [
-                '_default_message' => __('Error updating the data.'),
-                //'custom_field'   => __('Error updating custom field.'),
-            ]
-        ];
+        if ($this->can('delete inventory')) {
+            try {
+                $inventory = Inventory::findOrFail($id);
+                $inventory->delete();
+                $this->passed($inventory->item_code.' Inventory Item was deleted');
 
-        $message = ($updateMessages[$status][$field] ?? $updateMessages[$status]['_default_message']);
+                $users = User::all();
+                foreach ($users as $user) {
+                    if ($user->hasRole('Head of the Department')) {
+                        Notification::send($user, new GeneralNotificationJust('Inventory Item was deleted by '.auth()->user()->name));
+                    }
+                }
 
-        return (is_string($message)) ? $message : 'Error!';
+                session()->flash('toast_success', 'Item deleted successfully!');
+
+                return redirect(request()->header('Referer'));
+            } catch (\Throwable $th) {
+                $this->failed($th);
+            }
+        }
     }
 }

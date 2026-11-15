@@ -4,6 +4,9 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 @import "tailwindcss/screens";
+@import "flatpickr/dist/flatpickr.css";
+@import "../../vendor/power-components/livewire-powergrid/resources/css/tailwind.css";
+
 
 .form-label {
     @apply block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300;

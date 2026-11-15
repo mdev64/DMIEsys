@@ -52,7 +52,6 @@ class PermissionSeeder extends Seeder
             'see maintenance',
             'edit maintenance',
             'delete maintenance',
-            'do maintenance',
             'add inventory',
             'see inventory',
             'edit inventory',
@@ -82,7 +81,6 @@ class PermissionSeeder extends Seeder
         $otherPermissions = [
             'see notification',
             'can chat',
-            'see calender',
             'update profile picture'
         ];
 

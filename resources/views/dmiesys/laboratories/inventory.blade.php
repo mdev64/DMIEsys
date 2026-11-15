@@ -6,7 +6,6 @@
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('src/css/menu.css') }}">
-@powerGridStyles
 @endpush
 
 @section('content')
@@ -128,7 +127,3 @@
 </div>
 
 @endsection
-
-@push('scripts')
-@powerGridScripts
-@endpush

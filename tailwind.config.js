@@ -1,3 +1,5 @@
+const colors = require('tailwindcss/colors')
+
 module.exports = {
     content: [
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
@@ -10,7 +12,7 @@ module.exports = {
         './resources/views/**/**/**/*.blade.php',
         './resources/views/**/**/**/**/*.blade.php',
         './resources/views/**/**/**/**/**/*.blade.php',
-        './app/Http/Livewire/**/*Table.php',
+        './app/Http/Livewire/**/*.php',
         './vendor/power-components/livewire-powergrid/resources/views/**/*.php',
         './vendor/power-components/livewire-powergrid/src/Themes/Tailwind.php',
         './src/**/*.{html,js}',
@@ -27,6 +29,9 @@ module.exports = {
             '3xl': '1920px',
         },
         extend: {
+            colors: {
+                'pg-primary': colors.slate,
+            },
             spacing: {
                 '128': '32rem',
                 '144': '35rem',
@@ -44,4 +49,5 @@ module.exports = {
         require('flowbite/plugin'),
     ],
 }
+
 

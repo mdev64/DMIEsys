@@ -5,9 +5,7 @@
 @section('back_link') {{ route('dashboard') }} @endsection
 
 
-@push('styles')
-@powerGridStyles
-@endpush
+
 
 @section('content')
 
@@ -29,7 +27,3 @@
 </div>
 
 @endsection
-
-@push('scripts')
-@powerGridScripts
-@endpush

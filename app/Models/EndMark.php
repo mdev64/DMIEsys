@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Wildside\Userstamps\Userstamps;
+use Mattiverse\Userstamps\Traits\Userstamps;
 
 class EndMark extends Model
 {

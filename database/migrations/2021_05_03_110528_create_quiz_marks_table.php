@@ -29,7 +29,7 @@ return new class extends Migration
             $table->foreign('course_code')->references('course_code')->on('general_courses')->onUpdate('cascade')->onDelete('cascade');
             $table->foreign('course_id')->references('course_id')->on('courses')->onUpdate('cascade')->onDelete('cascade');
             $table->foreign('student_id')->references('student_id')->on('students')->onUpdate('cascade')->onDelete('cascade');
-            $table->foreign('quiz_code')->references('quiz_code')->on('quizzes')->onUpdate('cascade')->onDelete('cascade');
+            $table->foreign(['quiz_code', 'course_code'])->references(['quiz_code', 'course_code'])->on('quizzes')->onUpdate('cascade')->onDelete('cascade');
         });
     }
 };

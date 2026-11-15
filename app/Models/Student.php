@@ -4,7 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Wildside\Userstamps\Userstamps;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Mattiverse\Userstamps\Traits\Userstamps;
 
 class Student extends Model
 {
@@ -12,16 +14,19 @@ class Student extends Model
     use Userstamps;
 
     protected $primaryKey = 'student_id';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
+
     protected $guarded = [];
 
-    public function getAdvisor(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function getAdvisor(): HasOne
     {
         return $this->hasOne(App\Models\User::class, 'id', 'student_advisor');
     }
 
-    public function getAdvisoryComments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function getAdvisoryComments(): HasMany
     {
         return $this->hasMany(App\Models\AdvisoryComment::class, 'student_id', 'student_id');
     }
