@@ -10,16 +10,18 @@ use App\Models\PGRReferee;
 use App\Models\PGRUniversity;
 use App\Models\PostgraduateRegistration;
 use App\Models\Setting;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\View\View;
 
 class PGRegController extends Controller
 {
     /**
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function create()
     {
@@ -33,7 +35,7 @@ class PGRegController extends Controller
     }
 
     /**
-     * @return \Illuminate\Http\RedirectResponse|\Illuminate\View\View
+     * @return RedirectResponse|View
      */
     public function store(Request $request)
     {
@@ -49,7 +51,7 @@ class PGRegController extends Controller
             $messages = [
                 'ip.present' => 'Something is wrong. Please try again.',
                 'ip.ip' => 'Something is wrong. Please try again.',
-                'ip.unique' => 'You just submitted an application. You can not submit again.'
+                'ip.unique' => 'You just submitted an application. You can not submit again.',
             ]
         )->validate();
 
@@ -86,14 +88,14 @@ class PGRegController extends Controller
         for ($i = 1; $i <= $request['noofuniversities']; $i++) {
             try {
                 $request->validate([
-                    'degreetype' . $i => 'required|string|max:30',
-                    'university' . $i => 'required|string|max:100',
-                    'year' . $i => 'required|string|max:4',
-                    'specialization' . $i => 'nullable|string|max:100',
-                    'class' . $i => 'nullable|string|max:15',
-                    'credits' . $i => 'nullable|between:0,150',
-                    'gpa' . $i => 'nullable|string|max:4',
-                    'degreecetificate' . $i => 'nullable|mimes:pdf|max:20480',
+                    'degreetype'.$i => 'required|string|max:30',
+                    'university'.$i => 'required|string|max:100',
+                    'year'.$i => 'required|string|max:4',
+                    'specialization'.$i => 'nullable|string|max:100',
+                    'class'.$i => 'nullable|string|max:15',
+                    'credits'.$i => 'nullable|between:0,150',
+                    'gpa'.$i => 'nullable|string|max:4',
+                    'degreecetificate'.$i => 'nullable|mimes:pdf|max:20480',
                 ]);
             } catch (\Throwable $th) {
                 return back()->withErrors('Educational Qualifications section not complete!')->withInput();
@@ -103,9 +105,9 @@ class PGRegController extends Controller
         for ($i = 1; $i <= $request['noofcompanies']; $i++) {
             try {
                 $request->validate([
-                    'position' . $i => 'required|string|max:50',
-                    'employer' . $i => 'required|string|max:100',
-                    'period' . $i => 'required|string|max:20',
+                    'position'.$i => 'required|string|max:50',
+                    'employer'.$i => 'required|string|max:100',
+                    'period'.$i => 'required|string|max:20',
                 ]);
             } catch (\Throwable $th) {
                 return back()->withErrors('Employment History section not complete!')->withInput();
@@ -115,10 +117,10 @@ class PGRegController extends Controller
         for ($i = 1; $i <= $request['noofmemberships']; $i++) {
             try {
                 $request->validate([
-                    'organization' . $i => 'required|string|max:100',
-                    'membershipcat' . $i => 'required|string|max:100',
-                    'membershipno' . $i => 'required|string|max:20',
-                    'file_membership' . $i => 'nullable|mimes:pdf|max:20480',
+                    'organization'.$i => 'required|string|max:100',
+                    'membershipcat'.$i => 'required|string|max:100',
+                    'membershipno'.$i => 'required|string|max:20',
+                    'file_membership'.$i => 'nullable|mimes:pdf|max:20480',
                 ]);
             } catch (\Throwable $th) {
                 return back()->withErrors('Professional Qualifications section not complete!')->withInput();
@@ -145,12 +147,13 @@ class PGRegController extends Controller
                 'noofuniversities' => $request['noofuniversities'],
                 'noofcompanies' => $request['noofcompanies'],
                 'noofmemberships' => $request['noofmemberships'],
-                'file_path' => 'pg-registration/' . $year . '/' . $random_phase . '/',
+                'file_path' => 'pg-registration/'.$year.'/'.$random_phase.'/',
                 'random_phase' => $random_phase,
                 'ip' => $request['ip'],
             ]);
         } catch (\Throwable $th) {
             DB::rollback();
+
             return back()->withErrors('System failed when inserting personal details.')->withInput();
         }
 
@@ -158,19 +161,20 @@ class PGRegController extends Controller
             for ($i = 1; $i <= $request['noofuniversities']; $i++) {
                 PGRUniversity::create([
                     'nic' => Str::upper($request['nic']),
-                    'degreetype' => $request['degreetype' . $i],
-                    'university' => $request['university' . $i],
-                    'year' => $request['year' . $i],
-                    'specialization' => $request['specialization' . $i],
-                    'class' => $request['class' . $i],
-                    'credits' => $request['credits' . $i],
-                    'gpa' => $request['gpa' . $i],
-                    'hascetificate' => $request->hasFile('degreecetificate' . $i),
+                    'degreetype' => $request['degreetype'.$i],
+                    'university' => $request['university'.$i],
+                    'year' => $request['year'.$i],
+                    'specialization' => $request['specialization'.$i],
+                    'class' => $request['class'.$i],
+                    'credits' => $request['credits'.$i],
+                    'gpa' => $request['gpa'.$i],
+                    'hascetificate' => $request->hasFile('degreecetificate'.$i),
                     'registration_year' => $year,
                 ]);
             }
         } catch (\Throwable $th) {
             DB::rollback();
+
             return back()->withErrors('System failed when inserting education qulification data.')->withInput();
         }
 
@@ -178,14 +182,15 @@ class PGRegController extends Controller
             for ($i = 1; $i <= $request['noofcompanies']; $i++) {
                 PGRCompany::create([
                     'nic' => Str::upper($request['nic']),
-                    'position' => $request['position' . $i],
-                    'employer' => $request['employer' . $i],
-                    'period' => $request['period' . $i],
+                    'position' => $request['position'.$i],
+                    'employer' => $request['employer'.$i],
+                    'period' => $request['period'.$i],
                     'registration_year' => $year,
                 ]);
             }
         } catch (\Throwable $th) {
             DB::rollback();
+
             return back()->withErrors('System failed when inserting employement history data.')->withInput();
         }
 
@@ -193,21 +198,22 @@ class PGRegController extends Controller
             for ($i = 1; $i <= $request['noofmemberships']; $i++) {
                 PGRMembership::create([
                     'nic' => Str::upper($request['nic']),
-                    'organization' => $request['organization' . $i],
-                    'membershipcat' => $request['membershipcat' . $i],
-                    'membershipno' => $request['membershipno' . $i],
-                    'hasproof' => $request->hasFile('file_membership' . $i),
+                    'organization' => $request['organization'.$i],
+                    'membershipcat' => $request['membershipcat'.$i],
+                    'membershipno' => $request['membershipno'.$i],
+                    'hasproof' => $request->hasFile('file_membership'.$i),
                     'registration_year' => $year,
                 ]);
             }
         } catch (\Throwable $th) {
             DB::rollback();
+
             return back()->withErrors('System failed when inserting professional qualification data.')->withInput();
         }
 
         $tokens = [
             hash('sha384', Str::random(50)),
-            hash('sha384', Str::random(50))
+            hash('sha384', Str::random(50)),
         ];
 
         try {
@@ -215,9 +221,9 @@ class PGRegController extends Controller
                 PGRReferee::create([
                     'place' => $i,
                     'nic' => Str::upper($request['nic']),
-                    'name' => $request['r' . $i . 'name'],
-                    'email' => $request['r' . $i . 'email'],
-                    'designation' => $request['r' . $i . 'designation'],
+                    'name' => $request['r'.$i.'name'],
+                    'email' => $request['r'.$i.'email'],
+                    'designation' => $request['r'.$i.'designation'],
                     'token' => $tokens[$i - 1],
                     'exp_date' => now()->addWeeks(2),
                     'registration_year' => $year,
@@ -225,16 +231,19 @@ class PGRegController extends Controller
             }
         } catch (\Throwable $th) {
             DB::rollback();
+
             return back()->withErrors('System failed when inserting referee data')->withInput();
         }
 
         try {
-            $destination_path = 'pg-registration/' . $year . '/' . $random_phase;
+            $destination_path = 'pg-registration/'.$year.'/'.$random_phase;
             $file_nic = 'nic_copy.pdf';
             $transcript = 'transcript.pdf';
             $bank_slip = 'bank_slip.pdf';
             $request->file('file_nic')->storeAs($destination_path, $file_nic);
-            $request->file('bank_slip')->storeAs($destination_path, $bank_slip);
+            if ($request->hasFile('bank_slip')) {
+                $request->file('bank_slip')->storeAs($destination_path, $bank_slip);
+            }
             $request->file('transcript')->storeAs($destination_path, $transcript);
             if ($request->hasFile('ugcapproval')) {
                 $ugcapproval = 'ugc_approval.pdf';
@@ -245,59 +254,64 @@ class PGRegController extends Controller
                 $request->file('inductryexp')->storeAs($destination_path, $inductryexp);
             }
             for ($i = 1; $i <= $request['noofuniversities']; $i++) {
-                if ($request->hasFile('degreecetificate' . $i)) {
-                    $degreecetificate = $i . '_degree_certificate.pdf';
-                    $request->file('degreecetificate' . $i)->storeAs($destination_path, $degreecetificate);
+                if ($request->hasFile('degreecetificate'.$i)) {
+                    $degreecetificate = $i.'_degree_certificate.pdf';
+                    $request->file('degreecetificate'.$i)->storeAs($destination_path, $degreecetificate);
                 }
             }
             if ($request['noofmemberships'] != 0) {
                 for ($i = 1; $i <= $request['noofmemberships']; $i++) {
-                    $file_membership = $i . '_membership_proof_document.pdf';
-                    $request->file('file_membership' . $i)->storeAs($destination_path, $file_membership);
+                    if ($request->hasFile('file_membership'.$i)) {
+                        $file_membership = $i.'_membership_proof_document.pdf';
+                        $request->file('file_membership'.$i)->storeAs($destination_path, $file_membership);
+                    }
                 }
             }
         } catch (\Throwable $th) {
             DB::rollback();
+
             return back()->withErrors('System failed when uploading files.')->withInput();
         }
 
         try {
             $body = [
-                'name' => $request['fname'] . ' ' . $request['lname'],
+                'name' => $request['fname'].' '.$request['lname'],
                 'year' => $year,
             ];
             Mail::to($request['email'])->send(new NewPGRegistration($body));
 
             $gender = '';
-            if ($request['gender'] == 'male') $gender = 'his';
-            else if ($request['gender'] == 'female') $gender = 'her';
-            else if ($request['gender'] == 'notsay') $gender = 'his/her';
+            if ($request['gender'] == 'male') {
+                $gender = 'his';
+            } elseif ($request['gender'] == 'female') {
+                $gender = 'her';
+            } elseif ($request['gender'] == 'notsay') {
+                $gender = 'his/her';
+            }
             for ($i = 1; $i <= 2; $i++) {
                 $body = [
-                    'applicantname' => $request['fname'] . ' ' . $request['lname'],
+                    'applicantname' => $request['fname'].' '.$request['lname'],
                     'gender' => $gender,
                     'degree' => $request['applied_degree'],
                     'cat' => $request['degree_cat'],
-                    'refereename' => $request['r' . $i . 'name'],
-                    'url' => config('app.url') .  '/pg-registration/referee-report-upload/' . $tokens[$i - 1],
+                    'refereename' => $request['r'.$i.'name'],
+                    'url' => config('app.url').'/pg-registration/referee-report-upload/'.$tokens[$i - 1],
                     'exp_date' => now()->addWeeks(2)->toDateString(),
                 ];
-                Mail::to($request['r' . $i . 'email'])->send(new PGRegistrationReferee($body));
+                Mail::to($request['r'.$i.'email'])->send(new PGRegistrationReferee($body));
             }
             DB::commit();
         } catch (\Throwable $th) {
             DB::rollback();
+
             return back()->withErrors('System failed when sending emails.');
         }
-
 
         return back()->with('toast_success', 'Your application was submitted successfully.');
     }
 
     /**
-     * @param \Illuminate\Http\Request $request
-     * @param string $token
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function update(Request $request, string $token)
     {
@@ -315,21 +329,26 @@ class PGRegController extends Controller
 
         try {
             $referee->is_submit = 1;
-            if ($referee->place == '1') $student->r1_is_submit = 1;
-            elseif ($referee->place == '2') $student->r2_is_submit = 1;
+            if ($referee->place == '1') {
+                $student->r1_is_submit = 1;
+            } elseif ($referee->place == '2') {
+                $student->r2_is_submit = 1;
+            }
             $referee->save();
             $student->save();
         } catch (\Throwable $th) {
             DB::rollback();
+
             return back()->withErrors('System failed when uploading files.');
         }
 
         try {
             $destination_path = $student->file_path;
-            $file_report = 'referee_report_' . $referee->place . '.pdf';
+            $file_report = 'referee_report_'.$referee->place.'.pdf';
             $request->file('referee_report')->storeAs($destination_path, $file_report);
         } catch (\Throwable $th) {
             DB::rollback();
+
             return back()->withErrors('System failed when uploading files.');
         }
 
@@ -339,15 +358,18 @@ class PGRegController extends Controller
     }
 
     /**
-     * @param string $token
-     * @return \Illuminate\View\View
+     * @param  string  $token
+     * @return View
      */
     public function refereeReportUpload($token)
     {
         $referee = PGRReferee::where('token', $token)->firstOrFail();
 
-        if ($referee->exp_date < now()) $link_expired = true;
-        else $link_expired = false;
+        if ($referee->exp_date < now()) {
+            $link_expired = true;
+        } else {
+            $link_expired = false;
+        }
 
         $student = PostgraduateRegistration::where('nic', $referee->nic)->firstOrFail();
 

@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Mail\FacilityBookingRemindingForTO;
 use App\Mail\FacilityBookingRemindingForUser;
 use App\Models\BookingLab;
-use App\Models\Lab;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
@@ -43,12 +42,15 @@ class RemindFacilityBooking extends Command
      */
     public function handle()
     {
-        $bookings = BookingLab::where('approved', 1)->where('date', now()->format('Y-m-d'))->where('start_time', now()->addMinutes(30)->format('H:i:s'))->get();
-
-        // dd($bookings);
+        $bookings = BookingLab::where('approved', 1)->where('date', now()->format('Y-m-d'))
+            ->where('start_time', now()->addMinutes(30)->format('H:i:00'))->with('getLab')->get();
+        $technicalStaff = User::whereIn('id', $bookings->pluck('technical_staff')->filter()->unique())->get()->keyBy('id');
 
         foreach ($bookings as $booking) {
-            $user = User::where('id', $booking->technical_staff)->firstOrFail();
+            $user = $technicalStaff->get($booking->technical_staff);
+            if (! $user) {
+                continue;
+            }
 
             $body = [
                 'name' => $booking->name,
@@ -58,7 +60,7 @@ class RemindFacilityBooking extends Command
                 'to_email' => $user->email,
                 'to_phone' => $user->phone,
                 'department' => 'Manufacturing and Industrial Engineering',
-                'facility' => Lab::find($booking->lab_id)->name,
+                'facility' => $booking->getLab?->name,
                 'date' => date('Y-m-d', strtotime($booking->date)),
                 'start_time' => date('h:i a', strtotime($booking->start_time)),
                 'end_time' => date('h:i a', strtotime($booking->end_time)),

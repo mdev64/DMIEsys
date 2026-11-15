@@ -3,22 +3,27 @@
 namespace App\Http\Livewire;
 
 use App\Models\Student;
-use Livewire\Component;
 use Illuminate\Support\Str;
+use Livewire\Component;
 
 class ExternalUserAuthDropdown extends Component
 {
     public $selectedCategory = null;
+
     public $selectedBatch = null;
+
     public $selectedStudentID = null;
+
     public $batches;
+
     public $students;
+
     public $email = null;
 
     public function MaskEmail(string $originalEmail): string
     {
-        $emailPrefix =  Str::beforeLast($originalEmail, '@');
-        $emailPrefixLength =  Str::length($emailPrefix);
+        $emailPrefix = Str::beforeLast($originalEmail, '@');
+        $emailPrefixLength = Str::length($emailPrefix);
         $maskedEmail = Str::mask($originalEmail, '*', 2, $emailPrefixLength - 2);
 
         return $maskedEmail;
@@ -29,7 +34,7 @@ class ExternalUserAuthDropdown extends Component
         $this->students = collect();
         $this->email = null;
         $this->batches = Student::distinct()->orderByDesc('batch')->get('batch');
-        if (!is_null($this->selectedBatch)) {
+        if (! is_null($this->selectedBatch)) {
             $this->students = Student::undergraduate()->where('batch', $this->selectedBatch)->get('student_id');
         }
     }
@@ -59,6 +64,6 @@ class ExternalUserAuthDropdown extends Component
     {
         $this->mount();
         $user = Student::where('student_id', $this->selectedStudentID)->first();
-        $this->email = $this->MaskEmail($user->email);
+        $this->email = $user ? $this->MaskEmail($user->email) : null;
     }
 }

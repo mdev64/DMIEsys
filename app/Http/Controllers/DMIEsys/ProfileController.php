@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Intervention\Image\Laravel\Facades\Image;
 
@@ -20,7 +21,7 @@ class ProfileController extends Controller
      */
     public function create()
     {
-        $users = User::active()->get(['id', 'title', 'name', 'email', 'newuser']);
+        $users = User::active()->with('roles')->get(['id', 'title', 'name', 'email', 'newuser']);
 
         return view('dmiesys.human_resource.users', compact('users'));
     }
@@ -46,7 +47,7 @@ class ProfileController extends Controller
             $request->validate([
                 'title' => 'required|in:Mr,Miss,Mrs,Dr,Prof,Ms,Eng',
                 'name' => 'required|string|max:100',
-                'email' => ['required', 'email', new DisposableEmail, 'max:50'],
+                'email' => ['required', 'email', new DisposableEmail, 'max:50', Rule::unique('users', 'email')->ignore(auth()->id())],
                 'phone' => ['nullable', new TelephoneNumber],
                 'profilePicture' => 'bail|nullable|image|max:1024|dimensions:min_width=300,min_height=300',
             ]);

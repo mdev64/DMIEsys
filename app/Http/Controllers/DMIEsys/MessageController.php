@@ -2,25 +2,26 @@
 
 namespace App\Http\Controllers\DMIEsys;
 
+use App\Http\Controllers\Controller;
 use App\Models\User;
 use Carbon\Carbon;
 use Cmgmyr\Messenger\Models\Message;
 use Cmgmyr\Messenger\Models\Participant;
 use Cmgmyr\Messenger\Models\Thread;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request as NewRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Request as NewRequest;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Session;
-use App\Http\Controllers\Controller;
+use Illuminate\View\View;
 
 class MessageController extends Controller
 {
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function index()
     {
@@ -38,17 +39,16 @@ class MessageController extends Controller
     /**
      * Display a listing of the resource.
      *
-     * @param string $id
-     * @return \Illuminate\Http\RedirectResponse|\Illuminate\View\View
+     * @return RedirectResponse|View
      */
     public function show(string $id)
     {
         abort_unless(($this->can('can chat')), 404);
         try {
             $thread = Thread::findOrFail($id);
-            abort_unless((Arr::has($thread->participantsUserIds(), auth()->user()->id)), 404);
+            abort_unless(in_array(Auth::id(), $thread->participantsUserIds()), 404);
         } catch (ModelNotFoundException $e) {
-            Session::flash('error_message', 'The thread with ID: ' . $id . ' was not found.');
+            Session::flash('error_message', 'The thread with ID: '.$id.' was not found.');
 
             return redirect()->route('messages.index');
         }
@@ -64,7 +64,7 @@ class MessageController extends Controller
     /**
      * Display the specified resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function create()
     {
@@ -78,8 +78,7 @@ class MessageController extends Controller
     /**
      * Store a newly created resource in storage.
      *
-     * @param  NewRequest  $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function store(NewRequest $request)
     {
@@ -91,21 +90,21 @@ class MessageController extends Controller
 
         DB::beginTransaction();
         try {
-            //Thread
-            $thread = new Thread();
+            // Thread
+            $thread = new Thread;
             $thread->subject = $request->subject;
             $thread->save();
 
             try {
                 // Message
-                $message = new Message();
+                $message = new Message;
                 $message->thread_id = $thread->id;
                 $message->user_id = Auth::id();
                 $message->body = $request->message;
                 $message->save();
             } catch (\Throwable $th) {
                 // Message
-                $message = new Message();
+                $message = new Message;
                 $message->thread_id = $thread->id;
                 $message->user_id = Auth::id();
                 $message->body = $request->message;
@@ -114,14 +113,14 @@ class MessageController extends Controller
 
             try {
                 // Sender
-                $sender = new Participant();
+                $sender = new Participant;
                 $sender->thread_id = $thread->id;
                 $sender->user_id = Auth::id();
                 $sender->last_read = now();
                 $sender->save();
             } catch (\Throwable $th) {
                 // Sender
-                $sender = new Participant();
+                $sender = new Participant;
                 $sender->thread_id = $thread->id;
                 $sender->user_id = Auth::id();
                 $sender->last_read = now();
@@ -138,19 +137,17 @@ class MessageController extends Controller
         } catch (\Throwable $th) {
             $this->failed($th);
             DB::rollback();
+
             return back()->withErrors('Message sending failed!');
         }
 
         return back()->with('toast_success', 'Message sent!');
     }
 
-
     /**
      * Update resource in storage.
      *
-     * @param  NewRequest  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function update(NewRequest $request, int $id)
     {
@@ -159,10 +156,13 @@ class MessageController extends Controller
         try {
             $thread = Thread::findOrFail($id);
         } catch (\Throwable $th) {
-            Session::flash('error_message', 'The thread with ID: ' . $id . ' was not found.');
+            Session::flash('error_message', 'The thread with ID: '.$id.' was not found.');
             $this->failed($th);
+
             return redirect()->back();
         }
+
+        abort_unless(in_array(Auth::id(), $thread->participantsUserIds()), 404);
 
         DB::beginTransaction();
         try {
@@ -170,7 +170,7 @@ class MessageController extends Controller
 
             try {
                 // Message
-                $message = new Message();
+                $message = new Message;
                 $message->thread_id = $thread->id;
                 $message->user_id = Auth::id();
                 $message->body = $request->message;
@@ -189,13 +189,14 @@ class MessageController extends Controller
 
             // Recipients
             if ($request->recipients) {
-                $thread->addParticipant(explode(",", $request->recipients));
+                $thread->addParticipant(explode(',', $request->recipients));
             }
 
             DB::commit();
         } catch (\Throwable $th) {
             $this->failed($th);
             DB::rollback();
+
             return back()->withErrors('Message sending failed!');
         }
 

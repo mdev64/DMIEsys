@@ -5,12 +5,14 @@ namespace App\Http\Livewire;
 use App\Models\User;
 use App\Traits\Notify;
 use App\Traits\System;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class AssignNewHod extends Component
 {
-    use System, Notify;
+    use Notify, System;
 
     /** @var array */
     protected $rules = ([
@@ -21,21 +23,21 @@ class AssignNewHod extends Component
     public $user;
 
     /**
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function render()
     {
         return view('livewire.assign-new-hod', [
-            'activelecturers' => User::active()->get(['id', 'title', 'name']),
+            'activelecturers' => User::active()->with('roles')->get(['id', 'title', 'name']),
         ]);
     }
 
     /**
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function submitForm()
     {
-        $currentHOD = User::find(auth()->user()->id);
+        $currentHOD = auth()->user();
         abort_unless(($currentHOD->hasRole('Head of the Department')), 404);
 
         $this->validate();
@@ -51,28 +53,30 @@ class AssignNewHod extends Component
             $this->SetPermissionForUser($newHOD, 'change user role');
             $this->SetPermissionForUser($newHOD, 'change user permission');
             $this->SetPermissionForUser($newHOD, 'add user');
-            $this->passed($newHOD->name . ' was appointed as a new HoD');
+            $this->passed($newHOD->name.' was appointed as a new HoD');
         } catch (\Throwable $th) {
             DB::rollback();
             $this->failed($th);
             session()->flash('error', 'There was a problem, please check the logs to see more about this!');
+
             return back();
         }
         DB::commit();
 
         $otherUsers = User::where('id', '<>', $this->user)->get();
-        $message = $newHOD->title . ' ' . $newHOD->name . ' was appointed as the new Head of the Department.';
+        $message = $newHOD->title.' '.$newHOD->name.' was appointed as the new Head of the Department.';
         $this->notifyUsers($otherUsers, $message);
         $this->notifyUser($newHOD, '<strong class="text-pink-600">Congratulations</strong> for you becoming the new Head of the Department.');
+
         return redirect()->route('dashboard');
     }
 
     public function SetPermissionForUser(User $selectUser, string $permission): void
     {
-        if (!$selectUser->hasPermissionTo($permission)) {
+        if (! $selectUser->hasPermissionTo($permission)) {
             $selectUser->givePermissionTo($permission);
-            $this->passed($selectUser->name . ' got permission to <b>' . $permission . '</b>');
-            $this->notifyUser($selectUser, 'Now you have permission to <b>' . $permission . '</b>');
+            $this->passed($selectUser->name.' got permission to <b>'.$permission.'</b>');
+            $this->notifyUser($selectUser, 'Now you have permission to <b>'.$permission.'</b>');
         }
     }
 
@@ -80,8 +84,8 @@ class AssignNewHod extends Component
     {
         if ($selectUser->hasPermissionTo($permission)) {
             $selectUser->revokePermissionTo($permission);
-            $this->passed($selectUser->name . ' lost permission to <b>' . $permission . '</b>');
-            $this->notifyUser($selectUser, 'You lost the permission to <b>' . $permission . '</b>');
+            $this->passed($selectUser->name.' lost permission to <b>'.$permission.'</b>');
+            $this->notifyUser($selectUser, 'You lost the permission to <b>'.$permission.'</b>');
         }
     }
 }

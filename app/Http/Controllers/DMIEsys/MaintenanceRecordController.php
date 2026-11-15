@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\DMIEsys;
 
+use App\Http\Controllers\Controller;
 use App\Models\MaintenanceRecord;
 use App\Traits\Notify;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use App\Http\Controllers\Controller;
 
 class MaintenanceRecordController extends Controller
 {
@@ -26,50 +26,49 @@ class MaintenanceRecordController extends Controller
         return view('dmiesys.laboratories.manage-machines', compact('update_maintenance_records_auth', 'today_list'));
     }
 
-
     // public function create()
     // {
     //     //
     // }
-
 
     // public function store(Request $request)
     // {
     //     //
     // }
 
-
     // public function show(MaintenanceRecord $maintenanceRecord)
     // {
     //     //
     // }
-
 
     // public function edit(MaintenanceRecord $maintenanceRecord)
     // {
     //     //
     // }
 
-
     public function update(Request $request, MaintenanceRecord $maintenanceRecord)
     {
         abort_unless(($this->can('update maintenance')), 404);
+        abort_unless($maintenanceRecord->user_id == auth()->id(), 404);
 
         Validator::make($request->all(), [
             'comments' => 'nullable|min:5',
         ])->validate();
 
-        if ($request->comments == null) $comment = "The maintenance has been completed";
-        else $comment = $request->comments;
+        if ($request->comments == null) {
+            $comment = 'The maintenance has been completed';
+        } else {
+            $comment = $request->comments;
+        }
 
         $maintenanceRecord->comments = $comment;
         $maintenanceRecord->save();
 
-        $notification = auth()->user()->title . ' ' . auth()->user()->name . " has executed all of the maintenance duties that were assigned to him for today.";
+        $notification = auth()->user()->title.' '.auth()->user()->name.' has executed all of the maintenance duties that were assigned to him for today.';
 
         $remain_task = MaintenanceRecord::todayOpen()->where('user_id', auth()->user()->id)->count();
 
-        if (!$remain_task) {
+        if (! $remain_task) {
             $this->notifySelf("You completed all of today's maintenance tasks.");
             $this->notifyHOD($notification);
         }
@@ -78,7 +77,6 @@ class MaintenanceRecordController extends Controller
 
         return back()->with('toast_success', 'Maintenance completed successfully!');
     }
-
 
     // public function destroy(MaintenanceRecord $maintenanceRecord)
     // {

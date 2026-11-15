@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers\DMIEsys;
 
-use App\Models\BookingLab;
-use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Mail\FacilityBookingApproved;
 use App\Mail\FacilityBookingAssigned;
 use App\Mail\FacilityBookingPlaced;
 use App\Mail\FacilityBookingReceived;
 use App\Mail\FacilityBookingRejected;
+use App\Models\BookingLab;
 use App\Models\Lab;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 
 class BookingLabController extends Controller
@@ -59,32 +59,28 @@ class BookingLabController extends Controller
     {
         $request->validate([
             'lab' => 'required|exists:labs,id',
-            'date' => ['required', 'date', 'after:' . now()->addDays(config('settings.booking.min_days'))->format('Y-m-d'), 'before:' . now()->addDays(config('settings.booking.max_days'))->format('Y-m-d')],
+            'date' => ['required', 'date', 'after:'.now()->addDays(config('settings.booking.min_days'))->format('Y-m-d'), 'before:'.now()->addDays(config('settings.booking.max_days'))->format('Y-m-d')],
             'phone' => ['bail', 'nullable', 'alpha_num:ascii', 'min:10', 'max:10', 'regex:/^0[0-9]{9}$/'],
             'start_time' => 'required|date_format:H:i|before:end_time|after:07:59|before:17:01',
             'end_time' => 'required|date_format:H:i|after:start_time|after:07:59|before:17:01',
             'note' => 'nullable|string',
         ]);
 
-        //validate if the lab is available for booking on the selected date and time
+        // validate if the lab is available for booking on the selected date and time
 
         $bookings = BookingLab::where('date', date('Y-m-d', strtotime($request->date)))
             ->where('lab_id', $request->lab)
             ->where('rejected', 0)
-            ->where(function ($query) use ($request) {
-                $query->whereBetween('start_time', [$request->start_time, $request->end_time])
-                    ->orWhereBetween('end_time', [$request->start_time, $request->end_time]);
-            })
-            ->get();
+            ->where('start_time', '<=', $request->end_time)
+            ->where('end_time', '>=', $request->start_time)
+            ->exists();
 
-
-        if ($bookings->count() > 0) {
+        if ($bookings) {
             return back()->withErrors('The lab is not available for booking on the selected date and time. Please select another date and time.')->withInput();
         }
 
-
         try {
-            $lab_booking = new BookingLab();
+            $lab_booking = new BookingLab;
             $lab_booking->lab_id = $request->lab;
             $lab_booking->date = date('Y-m-d', strtotime($request->date));
             $lab_booking->start_time = $request->start_time;
@@ -98,12 +94,13 @@ class BookingLabController extends Controller
             $lab_booking->save();
         } catch (\Throwable $th) {
             $this->failed($th);
-            return back()->withErrors("There was a problem, please check the logs to see more about this!")->withInput();
+
+            return back()->withErrors('There was a problem, please check the logs to see more about this!')->withInput();
         }
 
-        $this->passed('Lab booked by internal members ' . auth()->user()->name . ' ' . ' on ' . $request->date . ' from ' . $request->start_time . ' to ' . $request->end_time);
+        $this->passed('Lab booked by internal members '.auth()->user()->name.' '.' on '.$request->date.' from '.$request->start_time.' to '.$request->end_time);
 
-        //send email LabBookingPlaced to the person who placed the booking
+        // send email LabBookingPlaced to the person who placed the booking
         $body = [
             'name' => auth()->user()->name,
             'email' => auth()->user()->email,
@@ -138,7 +135,6 @@ class BookingLabController extends Controller
         $booking = BookingLab::where('id', $booking_id)->where('rejected', 0)->where('approved', 0)->where('date', '>=', now()->format('Y-m-d'))->with('getLab')->firstOrFail();
 
         $technical_officers = User::active()->role(['Technical Officer', 'Instrument Mechanic', 'Machine Operator'])->get(['id', 'name']);
-
 
         return view('dmiesys.laboratories.book-facility', compact('approve_booking_single_auth', 'booking', 'technical_officers'));
     }
@@ -184,7 +180,7 @@ class BookingLabController extends Controller
             Mail::to($booking->email)->send(new FacilityBookingApproved($body));
             Mail::to($user->email)->send(new FacilityBookingAssigned($body));
 
-            $this->passed('Lab booking approved for ' . $booking->name . ' ' . ' on ' . $booking->date . ' from ' . $booking->start_time . ' to ' . $booking->end_time);
+            $this->passed('Lab booking approved for '.$booking->name.' '.' on '.$booking->date.' from '.$booking->start_time.' to '.$booking->end_time);
 
             return redirect()->route('book-labs.index')->with('toast_success', 'Booking approved successfully!');
         } else {
@@ -206,7 +202,7 @@ class BookingLabController extends Controller
 
             Mail::to($booking->email)->send(new FacilityBookingRejected($body));
 
-            $this->passed('Lab booking rejected for ' . $booking->name . ' ' . ' on ' . $booking->date . ' from ' . $booking->start_time . ' to ' . $booking->end_time);
+            $this->passed('Lab booking rejected for '.$booking->name.' '.' on '.$booking->date.' from '.$booking->start_time.' to '.$booking->end_time);
 
             return redirect()->route('book-labs.index')->with('toast_success', 'Booking rejected successfully!');
         }

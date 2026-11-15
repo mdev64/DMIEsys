@@ -23,12 +23,12 @@ class Student extends Model
 
     public function getAdvisor(): HasOne
     {
-        return $this->hasOne(App\Models\User::class, 'id', 'student_advisor');
+        return $this->hasOne(User::class, 'id', 'student_advisor');
     }
 
     public function getAdvisoryComments(): HasMany
     {
-        return $this->hasMany(App\Models\AdvisoryComment::class, 'student_id', 'student_id');
+        return $this->hasMany(AdvisoryComment::class, 'student_id', 'student_id');
     }
 
     public function scopeUndergraduate(object $query): object

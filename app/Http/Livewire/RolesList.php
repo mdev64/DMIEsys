@@ -38,7 +38,7 @@ class RolesList extends Component
         return view('livewire.roles-list', [
             'roles' => Role::where('name', '!=', 'Super Admin')->orderBy('id')->paginate(5),
             'all_roles' => Role::where('name', '!=', 'Super Admin')->get(),
-            'all_users' => User::active()->get(),
+            'all_users' => User::active()->with('roles')->get(),
             'permissions' => Permission::orderBy('id')->get(),
             'grouped_permissions' => $this->getGroupedPermissions(),
             'selectRole' => $this->role ? Role::find($this->role) : null,
@@ -48,6 +48,7 @@ class RolesList extends Component
 
     public function Submit(): RedirectResponse
     {
+        abort_unless($this->can('change user permission'), 404);
         $this->validate();
 
         try {
@@ -66,6 +67,8 @@ class RolesList extends Component
 
     public function DeleteRole(int $role_id): RedirectResponse
     {
+        abort_unless($this->can('change user permission'), 404);
+
         try {
             $role = Role::find($role_id);
             $role->delete();
@@ -82,6 +85,8 @@ class RolesList extends Component
 
     public function SetPermissionForRole(string $permission): void
     {
+        abort_unless($this->can('change user permission'), 404);
+
         $role = Role::find($this->role);
         if ($role->hasPermissionTo($permission)) {
             $role->revokePermissionTo($permission);
@@ -94,6 +99,8 @@ class RolesList extends Component
 
     public function SetPermissionForUser(string $permission): void
     {
+        abort_unless($this->can('change user permission'), 404);
+
         $user = User::find($this->user);
         if ($user->hasPermissionTo($permission)) {
             $user->revokePermissionTo($permission);
@@ -270,8 +277,10 @@ class RolesList extends Component
 
     public function toggleGroupPermissionsForRole(string $group): void
     {
+        abort_unless($this->can('change user permission'), 404);
+
         $role = Role::find($this->role);
-        if (!$role) {
+        if (! $role) {
             return;
         }
 
@@ -283,7 +292,7 @@ class RolesList extends Component
 
         $allGranted = true;
         foreach ($groupPerms as $perm) {
-            if (!$role->hasPermissionTo($perm->name)) {
+            if (! $role->hasPermissionTo($perm->name)) {
                 $allGranted = false;
                 break;
             }
@@ -293,7 +302,7 @@ class RolesList extends Component
             if ($allGranted) {
                 $role->revokePermissionTo($perm->name);
             } else {
-                if (!$role->hasPermissionTo($perm->name)) {
+                if (! $role->hasPermissionTo($perm->name)) {
                     $role->givePermissionTo($perm->name);
                 }
             }
@@ -305,8 +314,10 @@ class RolesList extends Component
 
     public function toggleGroupPermissionsForUser(string $group): void
     {
+        abort_unless($this->can('change user permission'), 404);
+
         $user = User::find($this->user);
-        if (!$user) {
+        if (! $user) {
             return;
         }
 
@@ -318,7 +329,7 @@ class RolesList extends Component
 
         $allGranted = true;
         foreach ($groupPerms as $perm) {
-            if (!$user->hasPermissionTo($perm->name)) {
+            if (! $user->hasPermissionTo($perm->name)) {
                 $allGranted = false;
                 break;
             }
@@ -330,7 +341,7 @@ class RolesList extends Component
                     $user->revokePermissionTo($perm->name);
                 }
             } else {
-                if (!$user->hasPermissionTo($perm->name)) {
+                if (! $user->hasPermissionTo($perm->name)) {
                     $user->givePermissionTo($perm->name);
                 }
             }

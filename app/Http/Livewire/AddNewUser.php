@@ -5,10 +5,12 @@ namespace App\Http\Livewire;
 use App\Mail\WelcomeNewUser;
 use App\Models\User;
 use App\Traits\System;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\View\View;
 use Livewire\Component;
 use Spatie\Permission\Models\Role;
 
@@ -35,7 +37,7 @@ class AddNewUser extends Component
     ]);
 
     /**
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function render()
     {
@@ -45,7 +47,7 @@ class AddNewUser extends Component
     }
 
     /**
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function submitForm()
     {
@@ -53,9 +55,10 @@ class AddNewUser extends Component
 
         $this->validate();
 
-        $username = 'user' . rand(1000, 9999);
-        $password = Str::random(6) . rand(1, 99);
+        $username = 'user'.rand(1000, 9999);
+        $password = Str::random(6).rand(1, 99);
         $role = Role::find($this->role);
+        abort_if(! $role || $role->name === 'Super Admin', 404);
 
         DB::beginTransaction();
         try {
@@ -69,7 +72,7 @@ class AddNewUser extends Component
                 'role' => $role['name'],
                 'username' => $username,
                 'password' => $password,
-                'url' => config('app.url')
+                'url' => config('app.url'),
             ];
 
             $newUser = User::where('username', $username)->first();
@@ -79,15 +82,17 @@ class AddNewUser extends Component
 
             DB::commit();
 
-            $this->passed($this->email . ' new user has added to the system.');
+            $this->passed($this->email.' new user has added to the system.');
         } catch (\Throwable $th) {
             DB::rollback();
             $this->failed($th);
             session()->flash('error', 'There was a problem, please check the logs to see more about this!');
+
             return back();
         }
 
         session()->flash('success', 'User added to the system. They\'ll get a email with the instructions.');
+
         return back();
     }
 }

@@ -5,20 +5,26 @@ namespace App\Http\Livewire;
 use App\Models\User;
 use App\Traits\Notify;
 use App\Traits\System;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 use Livewire\Component;
 use Spatie\Permission\Models\Role;
 
 class UpdateUserRole extends Component
 {
-    use System, Notify;
+    use Notify, System;
 
-    /** @var \Illuminate\Database\Eloquent\Collection */
+    /** @var Collection */
     public $roles;
-    /** @var \Illuminate\Database\Eloquent\Collection */
+
+    /** @var Collection */
     public $role;
+
     /** @var array */
     public $user;
-    /** @var \Illuminate\Database\Eloquent\Collection */
+
+    /** @var Collection */
     public $activeusers;
 
     /** @var array */
@@ -32,32 +38,36 @@ class UpdateUserRole extends Component
         $this->activeusers = User::active()->get(['id', 'title', 'name']);
         $this->roles = Role::where('name', '<>', 'Super Admin')->where('name', '<>', 'Head of the Department')->get();
     }
-    public function render(): \Illuminate\View\View
+
+    public function render(): View
     {
         return view('livewire.update-user-role');
     }
 
-    public function submitForm(): \Illuminate\Http\RedirectResponse
+    public function submitForm(): RedirectResponse
     {
         abort_unless(($this->can('change user role')), 404);
 
         $this->validate();
+        abort_if(in_array($this->role, ['Super Admin', 'Head of the Department']), 404);
 
         $user = User::find($this->user);
         try {
             $user->syncRoles($this->role);
-            $this->passed($user->name . '\'s role was changed to the ' . $this->role);
+            $this->passed($user->name.'\'s role was changed to the '.$this->role);
         } catch (\Throwable $th) {
             $this->failed($th);
             session()->flash('error', 'There was a problem, please check the logs to see more about this!');
+
             return back();
         }
 
-        $message = 'Your role was changed to the ' . $this->role . ' by the ' . auth()->user()->title . ' ' . auth()->user()->name;
+        $message = 'Your role was changed to the '.$this->role.' by the '.auth()->user()->title.' '.auth()->user()->name;
 
         $this->notifyUser($user, $message);
 
         session()->flash('success', 'User permission changed!');
+
         return back();
     }
 }

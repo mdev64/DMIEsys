@@ -8,14 +8,16 @@ use Livewire\Component;
 
 class DashboardNotifications extends Component
 {
-    /** @var bool */
-    public $hasNotifications;
+    /**
+     * Only the latest notifications are rendered, so only those are loaded.
+     */
+    private const VISIBLE_NOTIFICATIONS = 10;
 
     /** @var bool */
-    public $hasUnreadNotifications;
+    public $hasNotifications = false;
 
-    /** @var array */
-    public $unread_notifications;
+    /** @var bool */
+    public $hasUnreadNotifications = false;
 
     /** @var int */
     public $unread_notifications_count = 0;
@@ -27,90 +29,70 @@ class DashboardNotifications extends Component
     public $all_notifications_count = 0;
 
     /** @var int */
-    public $notificationCount;
+    public $notificationCount = 0;
 
     /** @var array */
-    protected $listeners = ['updateNotificationBadge' => 'mount'];
+    protected $listeners = ['updateNotificationBadge' => 'loadNotifications'];
 
-    /**
-     * @return void
-     */
-    public function mount()
+    public function mount(): void
     {
-        $this->hasNotifications = false;
-        $this->hasUnreadNotifications = false;
-        $this->unread_notifications = auth()->user()->unreadNotifications;
-        if ($this->unread_notifications) {
-            $this->unread_notifications_count = $this->unread_notifications->count();
-        }
-        $this->all_notifications = auth()->user()->notifications;
-        $this->all_notifications_count = $this->all_notifications->count();
-        if ($this->unread_notifications->count()) {
-            $this->hasUnreadNotifications = true;
-            $this->hasNotifications = true;
-            $this->notificationCount = $this->unread_notifications->count();
-        } elseif ($this->all_notifications->count()) {
-            $this->hasUnreadNotifications = false;
-            $this->hasNotifications = true;
-        }
-        $this->dispatch('updateNotificationBadge');
+        $this->loadNotifications();
     }
 
     /**
-     * @return View
+     * Refresh the notification list and counters. This must never dispatch
+     * "updateNotificationBadge" itself, because it is the listener of that event.
      */
-    public function render()
+    public function loadNotifications(): void
+    {
+        $user = auth()->user();
+
+        $this->all_notifications = $user->notifications()->limit(self::VISIBLE_NOTIFICATIONS)->get();
+        $this->all_notifications_count = $user->notifications()->count();
+        $this->unread_notifications_count = $user->unreadNotifications()->count();
+        $this->notificationCount = $this->unread_notifications_count;
+
+        $this->hasUnreadNotifications = $this->unread_notifications_count > 0;
+        $this->hasNotifications = $this->all_notifications_count > 0;
+    }
+
+    public function render(): View
     {
         return view('livewire.dashboard-notifications');
     }
 
-    /**
-     * @return void
-     */
-    public function MarkAsRead(string $id)
+    public function MarkAsRead(string $id): void
     {
-        foreach ($this->unread_notifications as $notifications) {
-            if ($notifications->id == $id) {
-                $notifications->markAsRead();
-                break;
-            }
-        }
-        $this->mount();
+        auth()->user()->unreadNotifications()->where('id', $id)->update(['read_at' => now()]);
+
+        $this->refreshNotifications();
     }
 
-    /**
-     * @return void
-     */
-    public function Delete(string $id)
+    public function Delete(string $id): void
     {
-        foreach ($this->all_notifications as $notifications) {
-            if ($notifications->id == $id) {
-                $notifications->delete();
-                break;
-            }
-        }
-        $this->mount();
+        auth()->user()->notifications()->where('id', $id)->delete();
+
+        $this->refreshNotifications();
     }
 
-    /**
-     * @return void
-     */
-    public function ReadAll()
+    public function ReadAll(): void
     {
-        foreach ($this->unread_notifications as $notifications) {
-            $notifications->markAsRead();
-        }
-        $this->mount();
+        auth()->user()->unreadNotifications()->update(['read_at' => now()]);
+
+        $this->refreshNotifications();
     }
 
-    /**
-     * @return void
-     */
-    public function DeleteAll()
+    public function DeleteAll(): void
     {
-        foreach ($this->all_notifications as $notifications) {
-            $notifications->delete();
-        }
-        $this->mount();
+        auth()->user()->notifications()->delete();
+
+        $this->refreshNotifications();
+    }
+
+    private function refreshNotifications(): void
+    {
+        $this->loadNotifications();
+
+        $this->dispatch('updateNotificationBadge')->to(NotificationBadge::class);
     }
 }
