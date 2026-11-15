@@ -3,7 +3,6 @@
 namespace App\Traits;
 
 use App\Models\Log;
-use App\Models\User;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 
 trait System
@@ -11,7 +10,7 @@ trait System
     public function can(string $action): bool
     {
         try {
-            $thisUser = User::find(auth()->user()->id);
+            $thisUser = auth()->user();
             if ($thisUser->hasRole('Super Admin')) {
                 return true;
             } elseif ($thisUser->hasPermissionTo($action)) {
@@ -27,7 +26,7 @@ trait System
     public function canAny(array $action): bool
     {
         try {
-            $thisUser = User::find(auth()->user()->id);
+            $thisUser = auth()->user();
             if ($thisUser->hasRole('Super Admin')) {
                 return true;
             } elseif ($thisUser->hasAnyPermission($action)) {

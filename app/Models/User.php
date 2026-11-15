@@ -57,6 +57,6 @@ class User extends Authenticatable
 
     public function getStudents(): HasMany
     {
-        return $this->hasMany(App\Models\Student::class, 'student_advisor', 'id')->where('graduated', 0);
+        return $this->hasMany(Student::class, 'student_advisor', 'id')->where('graduated', 0);
     }
 }

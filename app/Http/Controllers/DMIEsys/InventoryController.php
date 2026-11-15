@@ -220,8 +220,8 @@ class InventoryController extends Controller
     public function restore(int $id)
     {
         abort_unless(($this->can('delete inventory')), 404);
-        $item = Inventory::withTrashed()->find($id);
-        if ($item && $item->trashed()) {
+        $item = Inventory::withTrashed()->findOrFail($id);
+        if ($item->trashed()) {
             $item->restore();
         }
         $this->passed($item->item_code.' Inventory Item was restored');
@@ -238,6 +238,10 @@ class InventoryController extends Controller
     {
         abort_unless(($this->can('edit inventory')), 404);
 
+        Validator::make($request->all(), [
+            'photo' => 'required|image|max:5000',
+        ])->validate();
+
         if ($inventory->image_path) {
             try {
                 if (File::exists(public_path('storage/inventory-item-photos/'.$inventory->image_path))) {
@@ -249,10 +253,6 @@ class InventoryController extends Controller
                 return back()->withErrors('Something went wrong when uploading the image.');
             }
         }
-
-        Validator::make($request->all(), [
-            'photo' => 'required|image|max:5000',
-        ])->validate();
 
         try {
             $extention = $request->file('photo')->getClientOriginalExtension();

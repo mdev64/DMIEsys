@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\DMIEsys;
 
+use App\Http\Controllers\Controller;
 use App\Imports\MarksImport;
 use App\Models\Assignment;
 use App\Models\AssignmentMark;
@@ -19,18 +20,19 @@ use App\Models\Student;
 use App\Models\StudentEnrollment;
 use App\Models\Tutorial;
 use App\Models\TutorialMark;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Http\Controllers\Controller;
 
 class MarksController extends Controller
 {
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function index()
     {
@@ -50,7 +52,7 @@ class MarksController extends Controller
     /**
      * Show the form for creating a new resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function create()
     {
@@ -59,14 +61,14 @@ class MarksController extends Controller
         } else {
             abort(404);
         }
+
         return view('dmiesys.academics.manage-marks', compact('manage_marks_auth'));
     }
 
     /**
      * Store a newly created resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function store(Request $request)
     {
@@ -77,253 +79,139 @@ class MarksController extends Controller
         ])->validate();
 
         $file = $request->file('mark_sheet');
-        $marks = Excel::toArray(new MarksImport(), $file);
+        $marks = Excel::toArray(new MarksImport, $file);
         $marks = $marks[0];
 
-        //Validating General Information table
-        $info = [];
-        for ($row = 1; $row <= 10; $row++) {
-            if ($row < 3 && $marks[$row][1] == null) {
-                return back()->withErrors(['Empty cell in Information table: Row ' . ($row + 1)]);
-            }
-            $info[$marks[$row][0]] = $marks[$row][1];
+        if (! isset($marks[10])) {
+            return back()->withErrors(['The uploaded file does not match the marks sheet template.']);
         }
 
-        //Validating course code and course id
+        // Validating General Information table
+        $info = [];
+        for ($row = 1; $row <= 10; $row++) {
+            if ($row < 3 && ($marks[$row][1] ?? null) == null) {
+                return back()->withErrors(['Empty cell in Information table: Row '.($row + 1)]);
+            }
+            $info[$marks[$row][0] ?? ''] = $marks[$row][1] ?? null;
+        }
+
+        // Validating course code and course id
         Validator::make($info, [
-            'Course Code' => 'exists:general_courses,course_code',
-            'Course ID' => 'exists:courses,course_id',
+            'Course Code' => 'required|exists:general_courses,course_code',
+            'Course ID' => 'required|exists:courses,course_id',
         ])->validate();
 
-        //Validating course status
+        // Validating course status
         $course = Course::where('course_id', '=', $info['Course ID'])->first();
         if ($course->status == 'Complete') {
             return back()->withErrors(['This course was marked Complete and you can not upload another marks sheet without deleting the old marks']);
-        };
+        }
 
-        //Validating sum of Information Table
-        if ($info['Assignments'] + $info['Tutorials'] + $info['Quizzes'] + $info['Practicals'] + $info['Mid Exam'] + $info['End Exam'] != 100) {
+        // Validating sum of Information Table
+        $componentWeights = 0;
+        foreach (['Assignments', 'Tutorials', 'Quizzes', 'Practicals', 'Mid Exam', 'End Exam'] as $componentName) {
+            $componentWeights += (float) ($info[$componentName] ?? 0);
+        }
+        if ($componentWeights != 100) {
             return back()->withErrors(['Sum of the components in Information table not equal to 100']);
         }
 
-        //Validating students and get last row number
-        $lastrownumber = 0;
-        $students_list = [];
+        // Collecting students and get last row number
+        $studentIds = [];
+        $lastrownumber = 3;
         for ($row = 3; $row <= 500; $row++) {
-            if ($marks[$row][3] == null) {
-                $lastrownumber = $row;
+            if (($marks[$row][3] ?? null) == null) {
                 break;
             }
-            $students_list['student_id'] = $marks[$row][3];
-            Validator::make($students_list, [
-                'student_id' => 'exists:students',
-            ])->validate();
+            $studentIds[] = strtoupper((string) $marks[$row][3]);
+            $lastrownumber = $row + 1;
         }
 
-        //get the course informations
+        if ($studentIds === []) {
+            return back()->withErrors(['There are no students in the uploaded marks sheet.']);
+        }
+
+        // Validating all the students with a single query
+        $knownStudentIds = Student::whereIn('student_id', $studentIds)->pluck('student_id')
+            ->map(fn (string $studentId) => strtoupper($studentId))->all();
+        $unknownStudentIds = array_diff($studentIds, $knownStudentIds);
+        if ($unknownStudentIds !== []) {
+            return back()->withErrors(['student_id' => 'The selected student id is invalid: '.implode(', ', $unknownStudentIds)]);
+        }
+
+        // get the course informations
         $generelcourseinfo = GeneralCourse::where('course_code', '=', $info['Course Code'])->first();
+
+        $now = now();
+        $userId = auth()->id();
 
         DB::beginTransaction();
 
         try {
-            //update student table
-            for ($row = 3; $row < $lastrownumber; $row++) {
-                $student = Student::find($marks[$row][3]);
-                $student->hasMarks = 1;
-                $student->save();
-            }
-        } catch (\Throwable $th) {
-            DB::rollBack();
-            $this->failed($th);
-            return back()->withErrors("System failed to enter the marks. Please check your data again.");
-        }
+            // update student table
+            Student::whereIn('student_id', $studentIds)->update(['hasMarks' => 1]);
 
-        try {
-            //update student enrollement table
+            // update student enrollement table
+            $enrollments = [];
             for ($row = 3; $row < $lastrownumber; $row++) {
-                StudentEnrollment::create([
+                $enrollments[] = [
                     'student_id' => $marks[$row][3],
                     'name' => $marks[$row][4],
                     'course_id' => $info['Course ID'],
-                ]);
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
             }
-        } catch (\Throwable $th) {
-            DB::rollBack();
-            $this->failed($th);
-            return back()->withErrors("System failed to enter the marks. Please check your data again.");
-        }
+            foreach (array_chunk($enrollments, 500) as $chunk) {
+                StudentEnrollment::insert($chunk);
+            }
 
-        try {
-            //add marks to assignment marks table
-            if ($generelcourseinfo->total_assignments) {
-                for ($i = 1; $i <= $generelcourseinfo->total_assignments; $i++) {
-                    $assignmentinfo = Assignment::where('assignment_code', '=', 'assignment' . $i)->where('course_code', '=', $info['Course Code'])->first();
+            // add marks to each of the marks tables
+            foreach ($this->markComponents() as $component) {
+                $totalItems = (int) $generelcourseinfo->{$component['total']};
+                if (! $totalItems) {
+                    continue;
+                }
+
+                $definitions = $component['definition']::where('course_code', '=', $info['Course Code'])
+                    ->get()->keyBy($component['code_column']);
+
+                $markRows = [];
+                for ($i = 1; $i <= $totalItems; $i++) {
+                    $code = $component['prefix'].$i;
+                    $definition = $definitions->get($code);
+                    if (! $definition) {
+                        throw new \RuntimeException($code.' is not defined for the base course '.$info['Course Code']);
+                    }
+                    $column = $component['offset'] + $i;
+
                     for ($row = 3; $row < $lastrownumber; $row++) {
-                        AssignmentMark::create([
+                        $markRows[] = [
                             'student_id' => $marks[$row][3],
-                            'assignment_code' => 'assignment' . $i,
+                            $component['code_column'] => $code,
                             'course_id' => $info['Course ID'],
                             'course_code' => $info['Course Code'],
-                            'mark' => $marks[$row][4 + $i] * 100 / $marks[2][4 + $i],
-                            'lo_1_ref' => $assignmentinfo->lo_1,
-                            'lo_2_ref' => $assignmentinfo->lo_2,
-                            'lo_3_ref' => $assignmentinfo->lo_3,
-                            'lo_4_ref' => $assignmentinfo->lo_4,
-                            'lo_5_ref' => $assignmentinfo->lo_5,
-                            'lo_6_ref' => $assignmentinfo->lo_6,
-                        ]);
+                            'mark' => $marks[$row][$column] * 100 / $marks[2][$column],
+                            'lo_1_ref' => $definition->lo_1,
+                            'lo_2_ref' => $definition->lo_2,
+                            'lo_3_ref' => $definition->lo_3,
+                            'lo_4_ref' => $definition->lo_4,
+                            'lo_5_ref' => $definition->lo_5,
+                            'lo_6_ref' => $definition->lo_6,
+                            'created_by' => $userId,
+                            'updated_by' => $userId,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
                     }
                 }
-            }
-        } catch (\Throwable $th) {
-            DB::rollBack();
-            $this->failed($th);
-            return back()->withErrors("System failed to enter the marks. Please check your data again.");
-        }
 
-        try {
-            //add marks to tutorials marks table
-            if ($generelcourseinfo->total_tutorials) {
-                for ($i = 1; $i <= $generelcourseinfo->total_tutorials; $i++) {
-                    $tutorialinfo = Tutorial::where('tutorial_code', '=', 'tutorial' . $i)->where('course_code', '=', $info['Course Code'])->first();
-                    for ($row = 3; $row < $lastrownumber; $row++) {
-                        TutorialMark::create([
-                            'student_id' => $marks[$row][3],
-                            'tutorial_code' => 'tutorial' . $i,
-                            'course_id' => $info['Course ID'],
-                            'course_code' => $info['Course Code'],
-                            'mark' => $marks[$row][11 + $i] * 100 / $marks[2][11 + $i],
-                            'lo_1_ref' => $tutorialinfo->lo_1,
-                            'lo_2_ref' => $tutorialinfo->lo_2,
-                            'lo_3_ref' => $tutorialinfo->lo_3,
-                            'lo_4_ref' => $tutorialinfo->lo_4,
-                            'lo_5_ref' => $tutorialinfo->lo_5,
-                            'lo_6_ref' => $tutorialinfo->lo_6,
-                        ]);
-                    }
+                foreach (array_chunk($markRows, 500) as $chunk) {
+                    $component['marks']::insert($chunk);
                 }
             }
-        } catch (\Throwable $th) {
-            DB::rollBack();
-            $this->failed($th);
-            return back()->withErrors("System failed to enter the marks. Please check your data again.");
-        }
 
-        try {
-            //add marks to quizzes marks table
-            if ($generelcourseinfo->total_quizzes) {
-                for ($i = 1; $i <= $generelcourseinfo->total_quizzes; $i++) {
-                    $quizinfo = Quiz::where('quiz_code', '=', 'quiz' . $i)->where('course_code', '=', $info['Course Code'])->first();
-                    for ($row = 3; $row < $lastrownumber; $row++) {
-                        QuizMark::create([
-                            'student_id' => $marks[$row][3],
-                            'quiz_code' => 'quiz' . $i,
-                            'course_id' => $info['Course ID'],
-                            'course_code' => $info['Course Code'],
-                            'mark' => $marks[$row][17 + $i] * 100 / $marks[2][17 + $i],
-                            'lo_1_ref' => $quizinfo->lo_1,
-                            'lo_2_ref' => $quizinfo->lo_2,
-                            'lo_3_ref' => $quizinfo->lo_3,
-                            'lo_4_ref' => $quizinfo->lo_4,
-                            'lo_5_ref' => $quizinfo->lo_5,
-                            'lo_6_ref' => $quizinfo->lo_6,
-                        ]);
-                    }
-                }
-            }
-        } catch (\Throwable $th) {
-            DB::rollBack();
-            $this->failed($th);
-            return back()->withErrors("System failed to enter the marks. Please check your data again.");
-        }
-
-        try {
-            //add marks to practical marks table
-            if ($generelcourseinfo->total_practicals) {
-                for ($i = 1; $i <= $generelcourseinfo->total_practicals; $i++) {
-                    $practicalinfo = Practical::where('practical_code', '=', 'practical' . $i)->where('course_code', '=', $info['Course Code'])->first();
-                    for ($row = 3; $row < $lastrownumber; $row++) {
-                        PracticalMark::create([
-                            'student_id' => $marks[$row][3],
-                            'practical_code' => 'practical' . $i,
-                            'course_id' => $info['Course ID'],
-                            'course_code' => $info['Course Code'],
-                            'mark' => $marks[$row][20 + $i] * 100 / $marks[2][20 + $i],
-                            'lo_1_ref' => $practicalinfo->lo_1,
-                            'lo_2_ref' => $practicalinfo->lo_2,
-                            'lo_3_ref' => $practicalinfo->lo_3,
-                            'lo_4_ref' => $practicalinfo->lo_4,
-                            'lo_5_ref' => $practicalinfo->lo_5,
-                            'lo_6_ref' => $practicalinfo->lo_6,
-                        ]);
-                    }
-                }
-            }
-        } catch (\Throwable $th) {
-            DB::rollBack();
-            $this->failed($th);
-            return back()->withErrors("System failed to enter the marks. Please check your data again.");
-        }
-
-        try {
-            //add marks to mid_question marks table
-            if ($generelcourseinfo->total_midquestions) {
-                for ($i = 1; $i <= $generelcourseinfo->total_midquestions; $i++) {
-                    $mid_questioninfo = MidExamQuestion::where('mid_question_code', '=', 'midquestion' . $i)->where('course_code', '=', $info['Course Code'])->first();
-                    for ($row = 3; $row < $lastrownumber; $row++) {
-                        MidMark::create([
-                            'student_id' => $marks[$row][3],
-                            'mid_question_code' => 'midquestion' . $i,
-                            'course_id' => $info['Course ID'],
-                            'course_code' => $info['Course Code'],
-                            'mark' => $marks[$row][28 + $i] * 100 / $marks[2][28 + $i],
-                            'lo_1_ref' => $mid_questioninfo->lo_1,
-                            'lo_2_ref' => $mid_questioninfo->lo_2,
-                            'lo_3_ref' => $mid_questioninfo->lo_3,
-                            'lo_4_ref' => $mid_questioninfo->lo_4,
-                            'lo_5_ref' => $mid_questioninfo->lo_5,
-                            'lo_6_ref' => $mid_questioninfo->lo_6,
-                        ]);
-                    }
-                }
-            }
-        } catch (\Throwable $th) {
-            DB::rollBack();
-            $this->failed($th);
-            return back()->withErrors("System failed to enter the marks. Please check your data again.");
-        }
-
-        try {
-            //add marks to end_question marks table
-            if ($generelcourseinfo->total_endquestions) {
-                for ($i = 1; $i <= $generelcourseinfo->total_endquestions; $i++) {
-                    $end_questioninfo = EndExamQuestion::where('end_question_code', '=', 'endquestion' . $i)->where('course_code', '=', $info['Course Code'])->first();
-                    for ($row = 3; $row < $lastrownumber; $row++) {
-                        EndMark::create([
-                            'student_id' => $marks[$row][3],
-                            'end_question_code' => 'endquestion' . $i,
-                            'course_id' => $info['Course ID'],
-                            'course_code' => $info['Course Code'],
-                            'mark' => $marks[$row][33 + $i] * 100 / $marks[2][33 + $i],
-                            'lo_1_ref' => $end_questioninfo->lo_1,
-                            'lo_2_ref' => $end_questioninfo->lo_2,
-                            'lo_3_ref' => $end_questioninfo->lo_3,
-                            'lo_4_ref' => $end_questioninfo->lo_4,
-                            'lo_5_ref' => $end_questioninfo->lo_5,
-                            'lo_6_ref' => $end_questioninfo->lo_6,
-                        ]);
-                    }
-                }
-            }
-        } catch (\Throwable $th) {
-            DB::rollBack();
-            $this->failed($th);
-            return back()->withErrors("System failed to enter the marks. Please check your data again.");
-        }
-
-        try {
-            //mark course as complete
-            $course = Course::where('course_id', $info['Course ID'])->first();
+            // mark course as complete
             $course->status = 'Complete';
             $course->assignmentweight = $marks[5][1] ?? 0;
             $course->tutorialweight = $marks[6][1] ?? 0;
@@ -335,21 +223,38 @@ class MarksController extends Controller
         } catch (\Throwable $th) {
             DB::rollBack();
             $this->failed($th);
-            return back()->withErrors("System failed to enter the marks. Please check your data again.");
+
+            return back()->withErrors('System failed to enter the marks. Please check your data again.');
         }
 
         DB::commit();
+        $this->passed($info['Course ID'].' Marks were added.');
 
-        $this->passed($info['Course ID'] . ' Marks were added.');
+        return back()->with('toast_success', $info['Course ID'].' marks updated successfully!');
+    }
 
-        return back()->with('toast_success', $info['Course ID'] . ' marks updated successfully!');
+    /**
+     * The mark sheet layout: which base course counter, definition model, marks model
+     * and first column (zero based, exclusive) belongs to each assessment component.
+     *
+     * @return array<int, array{total: string, definition: class-string, marks: class-string, code_column: string, prefix: string, offset: int}>
+     */
+    private function markComponents(): array
+    {
+        return [
+            ['total' => 'total_assignments', 'definition' => Assignment::class, 'marks' => AssignmentMark::class, 'code_column' => 'assignment_code', 'prefix' => 'assignment', 'offset' => 4],
+            ['total' => 'total_tutorials', 'definition' => Tutorial::class, 'marks' => TutorialMark::class, 'code_column' => 'tutorial_code', 'prefix' => 'tutorial', 'offset' => 11],
+            ['total' => 'total_quizzes', 'definition' => Quiz::class, 'marks' => QuizMark::class, 'code_column' => 'quiz_code', 'prefix' => 'quiz', 'offset' => 17],
+            ['total' => 'total_practicals', 'definition' => Practical::class, 'marks' => PracticalMark::class, 'code_column' => 'practical_code', 'prefix' => 'practical', 'offset' => 20],
+            ['total' => 'total_midquestions', 'definition' => MidExamQuestion::class, 'marks' => MidMark::class, 'code_column' => 'mid_question_code', 'prefix' => 'midquestion', 'offset' => 28],
+            ['total' => 'total_endquestions', 'definition' => EndExamQuestion::class, 'marks' => EndMark::class, 'code_column' => 'end_question_code', 'prefix' => 'endquestion', 'offset' => 33],
+        ];
     }
 
     /**
      * Delete the specified resource in storage.
      *
-     * @param  string $course_id
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function destroy(string $course_id)
     {
@@ -367,7 +272,8 @@ class MarksController extends Controller
         } catch (\Throwable $th) {
             $this->failed($th);
             DB::rollback();
-            return back()->withErrors("There was a problem, please check the logs to see more about this!");
+
+            return back()->withErrors('There was a problem, please check the logs to see more about this!');
         }
 
         try {
@@ -383,12 +289,14 @@ class MarksController extends Controller
         } catch (\Throwable $th) {
             $this->failed($th);
             DB::rollback();
-            return back()->withErrors("There was a problem, please check the logs to see more about this!");
+
+            return back()->withErrors('There was a problem, please check the logs to see more about this!');
         }
 
-        $this->passed($course_id . ' Marks deleted');
+        $this->passed($course_id.' Marks deleted');
 
         DB::commit();
-        return back()->with('toast_success', $course_id . ' marks deleted successfully!');
+
+        return back()->with('toast_success', $course_id.' marks deleted successfully!');
     }
 }

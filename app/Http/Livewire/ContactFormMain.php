@@ -4,23 +4,31 @@ namespace App\Http\Livewire;
 
 use App\Mail\ContactFormMail;
 use App\Models\ContactFormMessage;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\View\View;
 use Livewire\Component;
 
 class ContactFormMain extends Component
 {
     /** @var string */
     public $name;
+
     /** @var string */
     public $email;
+
     /** @var string */
     public $phone;
+
     /** @var string */
     public $message;
+
     /** @var bool */
     public $is_success;
+
     /** @var bool */
     public $is_failed;
+
     /** @var string */
     public $errormsg;
 
@@ -48,7 +56,7 @@ class ContactFormMain extends Component
     }
 
     /**
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function render()
     {
@@ -56,8 +64,7 @@ class ContactFormMain extends Component
     }
 
     /**
-     * @param string $ip
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function formSubmit(string $ip)
     {
@@ -66,15 +73,17 @@ class ContactFormMain extends Component
         } catch (\Throwable $th) {
             $this->is_failed = true;
             $this->errormsg = 'Check fields again!';
+
             return back();
         }
 
-        //check daily message limit
+        // check daily message limit
         $old_messages_count = ContactFormMessage::where('ip', $ip)->where('created_at', '>', now()->subDay())->count();
 
         if ($old_messages_count >= 3) {
             $this->is_failed = true;
             $this->errormsg = 'Daily limit reached!';
+
             return back();
         }
 
@@ -84,11 +93,12 @@ class ContactFormMain extends Component
                 'email' => $this->email,
                 'phone' => $this->phone,
                 'message' => $this->message,
-                'ip' => $ip
+                'ip' => $ip,
             ]);
         } catch (\Throwable $th) {
             $this->is_failed = true;
             $this->errormsg = 'Something went wrong!';
+
             return back();
         }
 
@@ -97,12 +107,13 @@ class ContactFormMain extends Component
                 'name' => $this->name,
                 'email' => $this->email,
                 'phone' => $this->phone,
-                'message' => $this->message
+                'message' => $this->message,
             ];
-            Mail::to(env('MAIL_RECIPIENT'))->send(new ContactFormMail($body));
+            Mail::to(config('settings.emails.office'))->send(new ContactFormMail($body));
         } catch (\Throwable $th) {
             $this->is_failed = true;
             $this->errormsg = 'Something went wrong!';
+
             return back();
         }
 
@@ -111,6 +122,7 @@ class ContactFormMain extends Component
         $this->email = '';
         $this->phone = '';
         $this->message = '';
+
         return back();
     }
 }

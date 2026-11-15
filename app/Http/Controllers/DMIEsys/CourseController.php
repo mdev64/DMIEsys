@@ -2,20 +2,22 @@
 
 namespace App\Http\Controllers\DMIEsys;
 
+use App\Http\Controllers\Controller;
 use App\Jobs\CreateGoogleDriveFolders;
 use App\Models\Course;
 use App\Models\GeneralCourse;
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use App\Http\Controllers\Controller;
+use Illuminate\View\View;
 
 class CourseController extends Controller
 {
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function index()
     {
@@ -33,11 +35,11 @@ class CourseController extends Controller
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function create()
     {
-        //variables
+        // variables
         $general_course_list = [];
         $years = [];
         $semesters = [];
@@ -53,7 +55,7 @@ class CourseController extends Controller
 
         for ($i = -2; $i < 6; $i++) {
             array_push($years, date('Y', time()) + $i);
-            array_push($batches, 'E' . (date('Y', time()) + ($i - 2005)));
+            array_push($batches, 'E'.(date('Y', time()) + ($i - 2005)));
         }
 
         for ($i = 1; $i < 9; $i++) {
@@ -70,8 +72,7 @@ class CourseController extends Controller
     /**
      * Store a newly created resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function store(Request $request)
     {
@@ -92,13 +93,13 @@ class CourseController extends Controller
         ])->validate();
 
         $coordinator = User::where('username', '=', $request['coordinator'])->first();
-        $coordinator = $coordinator->title . ' ' . $coordinator->name;
+        $coordinator = $coordinator->title.' '.$coordinator->name;
         $moderator = User::where('username', '=', $request['moderator'])->first();
-        $moderator = $moderator->title . ' ' . $moderator->name;
+        $moderator = $moderator->title.' '.$moderator->name;
         $secondexaminer = User::where('username', '=', $request['secondexaminer'])->first();
-        $secondexaminer = $secondexaminer->title . ' ' . $secondexaminer->name;
+        $secondexaminer = $secondexaminer->title.' '.$secondexaminer->name;
         $instructorincharge = User::where('username', '=', $request['instructorincharge'])->first();
-        $instructorincharge = $instructorincharge->title . ' ' . $instructorincharge->name;
+        $instructorincharge = $instructorincharge->title.' '.$instructorincharge->name;
 
         try {
             Course::create([
@@ -121,30 +122,28 @@ class CourseController extends Controller
             ]);
         } catch (\Throwable $th) {
             $this->failed($th);
-            return back()->withErrors("There was a problem, please check the logs to see more about this!");
+
+            return back()->withErrors('There was a problem, please check the logs to see more about this!');
         }
 
-        $course = Course::where('course_id', $request['course_id'])->first();
-        $user = User::find(auth()->user()->id);
         // CreateGoogleDriveFolders::dispatch($course, $user);
 
-        $this->passed($request['course_id'] . ' course was created');
+        $this->passed($request['course_id'].' course was created');
 
-        return back()->with('toast_success', $request['course_id'] . ' course created successfully!');
+        return back()->with('toast_success', $request['course_id'].' course created successfully!');
     }
 
     /**
      * Display the specified resource.
      *
-     * @param  string  $course_id
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function show(string $course_id)
     {
         abort_unless(($this->can('see course')), 404);
 
-        $course = Course::where('course_id', '=', $course_id)->first();
-        $generalcourse = GeneralCourse::where('course_code', '=', $course->course_code)->first();
+        $course = Course::where('course_id', '=', $course_id)->firstOrFail();
+        $generalcourse = GeneralCourse::where('course_code', '=', $course->course_code)->firstOrFail();
         $genre = $generalcourse->genre;
         $credit = $generalcourse->credit;
 
@@ -154,8 +153,7 @@ class CourseController extends Controller
     /**
      * Display the specified resource.
      *
-     * @param  string  $course_id
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function edit(string $course_id)
     {
@@ -168,8 +166,7 @@ class CourseController extends Controller
         $years = [];
         $semesters = [];
 
-        $course = Course::where('course_id', '=', $course_id)->first();
-
+        $course = Course::where('course_id', '=', $course_id)->firstOrFail();
         for ($i = -1; $i < 5; $i++) {
             array_push($years, date('Y', time()) + $i);
         }
@@ -177,8 +174,6 @@ class CourseController extends Controller
         for ($i = 1; $i < 9; $i++) {
             array_push($semesters, $i);
         }
-
-        $users = User::where('newuser', '0')->get();
 
         $lecturers = User::role(['Head of the Department', 'Professor', 'Senior Lecturer', 'Lecturer', 'Contract Basis Lecturer', 'Probationary Lecturer', 'Visiting Lecture', 'Temporary Lecturer'])->active()->get(['username', 'name']);
 
@@ -190,16 +185,14 @@ class CourseController extends Controller
     /**
      * Update the specified resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  string  $course_id
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function update(Request $request, string $course_id)
     {
         abort_unless(($this->can('edit course')), 404);
 
         Validator::make($request->all(), [
-            'course_id' => ['required', 'exists:courses', 'in:' . $course_id],
+            'course_id' => ['required', 'exists:courses', 'in:'.$course_id],
             'year' => 'required|size:4',
             'semester' => 'required|digits_between:1,8',
             'period' => 'required',
@@ -210,13 +203,13 @@ class CourseController extends Controller
         ])->validate();
 
         $coordinator = User::where('username', '=', $request['coordinator'])->first();
-        $coordinator = $coordinator->title . ' ' . $coordinator->name;
+        $coordinator = $coordinator->title.' '.$coordinator->name;
         $moderator = User::where('username', '=', $request['moderator'])->first();
-        $moderator = $moderator->title . ' ' . $moderator->name;
+        $moderator = $moderator->title.' '.$moderator->name;
         $secondexaminer = User::where('username', '=', $request['secondexaminer'])->first();
-        $secondexaminer = $secondexaminer->title . ' ' . $secondexaminer->name;
+        $secondexaminer = $secondexaminer->title.' '.$secondexaminer->name;
         $instructorincharge = User::where('username', '=', $request['instructorincharge'])->first();
-        $instructorincharge = $instructorincharge->title . ' ' . $instructorincharge->name;
+        $instructorincharge = $instructorincharge->title.' '.$instructorincharge->name;
 
         try {
             $course = Course::where('course_id', $course_id)->first();
@@ -234,11 +227,12 @@ class CourseController extends Controller
             $course->save();
         } catch (\Throwable $th) {
             $this->failed($th);
-            return back()->withErrors("There was a problem, please check the logs to see more about this!");
+
+            return back()->withErrors('There was a problem, please check the logs to see more about this!');
         }
 
-        $this->passed($request['course_id'] . ' course was updated');
+        $this->passed($request['course_id'].' course was updated');
 
-        return redirect()->route('course.index')->with('toast_success', $request['course_id'] . ' course updated successfully!');
+        return redirect()->route('course.index')->with('toast_success', $request['course_id'].' course updated successfully!');
     }
 }

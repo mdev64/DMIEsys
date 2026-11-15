@@ -2,26 +2,30 @@
 
 namespace App\Http\Controllers\DMIEsys;
 
+use App\Http\Controllers\Controller;
 use App\Imports\ExcelImport;
 use App\Mail\SetStudentAdvisor;
 use App\Models\Student;
 use App\Models\User;
 use App\Traits\Notify;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
-use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Str;
-use App\Http\Controllers\Controller;
+use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StudentAdvisorController extends Controller
 {
     use Notify;
+
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function index()
     {
@@ -41,7 +45,7 @@ class StudentAdvisorController extends Controller
     /**
      * Show the form for creating a new resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function create()
     {
@@ -50,13 +54,14 @@ class StudentAdvisorController extends Controller
         } else {
             abort(404);
         }
+
         return view('dmiesys.academics.student-affairs', compact('enter_student_advisor_single_auth'));
     }
 
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function createBulk()
     {
@@ -65,14 +70,14 @@ class StudentAdvisorController extends Controller
         } else {
             abort(404);
         }
+
         return view('dmiesys.academics.student-affairs', compact('enter_student_advisor_bulk_auth'));
     }
 
     /**
      * Store a newly created resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function store(Request $request)
     {
@@ -86,41 +91,55 @@ class StudentAdvisorController extends Controller
         $file = $request->file('student_advisor_list');
 
         $filename = $file->getClientOriginalName();
-        if (!(Str::contains($filename, 'v1.0'))) {
+        if (! (Str::contains($filename, 'v1.0'))) {
             return back()->withErrors('You upload an older version of a template. Please download and use the latest template version.');
-        } elseif (!(Str::contains($filename, $request->batch))) {
+        } elseif (! (Str::contains($filename, $request->batch))) {
             return back()->withErrors('It seems you have uploaded a wrong file. (Complete the blank spaces in the file name if you did not do it previously.)');
         }
 
-        $advisors = Excel::toArray(new ExcelImport(), $file);
+        $advisors = Excel::toArray(new ExcelImport, $file);
         $advisors = $advisors[0];
 
-        //validate all the students in the system
-        //validate advisor's email address
+        // validate all the students in the system
+        // validate advisor's email address
         foreach ($advisors as $advisor) {
             Validator::make($advisor, [
-                'student_reg_no' => 'required|exists:students,student_id',
-                'advisor_email' => 'required|exists:users,email',
+                'student_reg_no' => 'required',
+                'advisor_email' => 'required',
             ])->validate();
+        }
+
+        $students = Student::whereIn('student_id', array_column($advisors, 'student_reg_no'))->get()
+            ->keyBy(fn (Student $student) => Str::upper($student->student_id));
+        $lecturerIds = User::whereIn('email', array_column($advisors, 'advisor_email'))->get(['id', 'email'])
+            ->mapWithKeys(fn (User $lecturer) => [Str::lower($lecturer->email) => $lecturer->id]);
+
+        foreach ($advisors as $advisor) {
+            if (! $students->has(Str::upper($advisor['student_reg_no']))) {
+                return back()->withErrors('The student '.$advisor['student_reg_no'].' is not in the system.');
+            }
+            if (! $lecturerIds->has(Str::lower($advisor['advisor_email']))) {
+                return back()->withErrors('There is no user with the email '.$advisor['advisor_email'].'.');
+            }
         }
 
         DB::beginTransaction();
         try {
             foreach ($advisors as $advisor) {
-                $student = Student::where('student_id', $advisor['student_reg_no'])->first();
-                $lecturer = User::where('email', $advisor['advisor_email'])->first(['id']);
-                $student->student_advisor = $lecturer->id;
+                $student = $students->get(Str::upper($advisor['student_reg_no']));
+                $student->student_advisor = $lecturerIds->get(Str::lower($advisor['advisor_email']));
                 $student->last_advisory_report = now()->subMonths(2)->toDateString();
                 $student->save();
             }
         } catch (\Throwable $th) {
             DB::rollBack();
             $this->failed($th);
+
             return back()->withErrors('Something went wrong. Please check your data.');
         }
         DB::commit();
-        return back()->with('toast_success', "Students' advisory list updated successfully!");
 
+        return back()->with('toast_success', "Students' advisory list updated successfully!");
 
         // dd($advisors);
     }
@@ -129,7 +148,7 @@ class StudentAdvisorController extends Controller
      * Display the specified resource.
      *
      * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function show($id)
     {
@@ -140,7 +159,7 @@ class StudentAdvisorController extends Controller
      * Show the form for editing the specified resource.
      *
      * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function edit($id)
     {
@@ -150,12 +169,13 @@ class StudentAdvisorController extends Controller
     /**
      * Update the specified resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @param  int  $id
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function update(Request $request, $id)
     {
+        abort_unless(($this->can('add student advisor')), 404);
+
         $validated = $request->validate([
             'student_id' => 'required|exists:students',
             'advisor' => 'required|exists:users,id',
@@ -171,15 +191,18 @@ class StudentAdvisorController extends Controller
             $student->save();
 
             $body = [
-                'advisor' => $advisor['title'] . ' ' . $advisor['name'],
+                'advisor' => $advisor['title'].' '.$advisor['name'],
                 'email' => $advisor['email'],
                 'phone' => $advisor['phone'],
                 'student' => $student['name'],
             ];
-            $message = 'You have been appointed as an academic advisor for <b>' . $student->student_id . '</b>';
+            $message = 'You have been appointed as an academic advisor for <b>'.$student->student_id.'</b>';
             $this->notifyUser($advisor, $message);
-            if ($request->has('send-a-mail')) Mail::to($student->email)->send(new SetStudentAdvisor($body));
-            $this->passed('Set a advisor for ' . $validated['student_id']);
+            if ($request->has('send-a-mail')) {
+                Mail::to($student->email)->send(new SetStudentAdvisor($body));
+            }
+            $this->passed('Set a advisor for '.$validated['student_id']);
+
             return back()->with('toast_success', 'Student record updated!');
         } catch (\Throwable $th) {
             return back()->withErrors('Something went wrong!');
@@ -190,7 +213,7 @@ class StudentAdvisorController extends Controller
      * Remove the specified resource from storage.
      *
      * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function destroy($id)
     {

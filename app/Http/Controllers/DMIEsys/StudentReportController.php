@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\DMIEsys;
 
+use App\Http\Controllers\Controller;
 use App\Models\AssignmentMark;
 use App\Models\Course;
 use App\Models\EndMark;
@@ -11,12 +12,13 @@ use App\Models\PracticalMark;
 use App\Models\QuizMark;
 use App\Models\Student;
 use App\Models\TutorialMark;
-use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class StudentReportController extends Controller
 {
     /**
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function index()
     {
@@ -25,12 +27,12 @@ class StudentReportController extends Controller
         } else {
             abort(404);
         }
+
         return view('dmiesys.academics.student-attainment', compact('student_attainment_auth'));
     }
 
     /**
-     * @param string $student_id
-     * @return \Illuminate\Http\RedirectResponse|\Illuminate\View\View
+     * @return RedirectResponse|View
      */
     public function show(string $student_id)
     {
@@ -38,8 +40,8 @@ class StudentReportController extends Controller
 
         try {
             $studentdetails = Student::where('student_id', '=', $student_id)->first();
-            if (!$studentdetails) {
-                return back()->withErrors("Student " . $student_id . " was not found.");
+            if (! $studentdetails) {
+                return back()->withErrors('Student '.$student_id.' was not found.');
             }
             $courselist = [];
             $assignmentmarks = AssignmentMark::where('student_id', '=', $student_id)->get();
@@ -49,7 +51,7 @@ class StudentReportController extends Controller
             $midmarks = MidMark::where('student_id', '=', $student_id)->get();
             $endmarks = EndMark::where('student_id', '=', $student_id)->get();
 
-            //find course list where student entrolled
+            // find course list where student entrolled
             foreach ($assignmentmarks as $assignmentmark) {
                 array_push($courselist, $assignmentmark->course_id);
             }
@@ -69,17 +71,19 @@ class StudentReportController extends Controller
                 array_push($courselist, $endmark->course_id);
             }
 
-            //remove duplicates and sort
+            // remove duplicates and sort
             $courselist = array_flip($courselist);
             $courselist = array_flip($courselist);
             $courselist = array_values($courselist);
             sort($courselist);
 
             $coursedetails = [];
+            $courses = Course::whereIn('course_id', $courselist)->get()->keyBy('course_id');
+            $basecourses = GeneralCourse::whereIn('course_code', $courses->pluck('course_code')->unique())->get()->keyBy('course_code');
 
             for ($i = 0; $i < count($courselist); $i++) {
-                $course = Course::where('course_id', '=', $courselist[$i])->first();
-                $basecourse = GeneralCourse::where('course_code', '=', $course->course_code)->first();
+                $course = $courses->get($courselist[$i]);
+                $basecourse = $basecourses->get($course->course_code);
                 $lo_1 = 0;
                 $lo_2 = 0;
                 $lo_3 = 0;
@@ -154,7 +158,7 @@ class StudentReportController extends Controller
                 }
                 $locount = 0;
                 for ($x = 6; $x > $basecourse->total_los; $x--) {
-                    $basecourse['lo_' . $x] = 1;
+                    $basecourse['lo_'.$x] = 1;
                 }
                 if ($lo_1 * 2 >= $basecourse->lo_1) {
                     $locount++;
@@ -196,12 +200,12 @@ class StudentReportController extends Controller
                     'lo_4' => round($lo_4, 0),
                     'lo_5' => round($lo_5, 0),
                     'lo_6' => round($lo_6, 0),
-                    'lo_1_%' => $lo_1 * 100 / $basecourse->lo_1,
-                    'lo_2_%' => $lo_2 * 100 / $basecourse->lo_2,
-                    'lo_3_%' => $lo_3 * 100 / $basecourse->lo_3,
-                    'lo_4_%' => $lo_4 * 100 / $basecourse->lo_4,
-                    'lo_5_%' => $lo_5 * 100 / $basecourse->lo_5,
-                    'lo_6_%' => $lo_6 * 100 / $basecourse->lo_6,
+                    'lo_1_%' => $basecourse->lo_1 ? $lo_1 * 100 / $basecourse->lo_1 : 100,
+                    'lo_2_%' => $basecourse->lo_2 ? $lo_2 * 100 / $basecourse->lo_2 : 100,
+                    'lo_3_%' => $basecourse->lo_3 ? $lo_3 * 100 / $basecourse->lo_3 : 100,
+                    'lo_4_%' => $basecourse->lo_4 ? $lo_4 * 100 / $basecourse->lo_4 : 100,
+                    'lo_5_%' => $basecourse->lo_5 ? $lo_5 * 100 / $basecourse->lo_5 : 100,
+                    'lo_6_%' => $basecourse->lo_6 ? $lo_6 * 100 / $basecourse->lo_6 : 100,
                 ]);
             }
 
@@ -232,14 +236,14 @@ class StudentReportController extends Controller
                     $summary['total_lo_cc'] += $coursedetail['total_los'];
                     $summary['passed_cc']++;
                     for ($i = 1; $i <= $coursedetail['total_los']; $i++) {
-                        if ($coursedetail['lo_' . $i . '_%'] < 50) {
+                        if ($coursedetail['lo_'.$i.'_%'] < 50) {
                             $summary['passed_cc']--;
                             break;
                         }
                     }
                     $summary['passed_lo_cc'] += $coursedetail['total_los'];
                     for ($i = 1; $i <= $coursedetail['total_los']; $i++) {
-                        if ($coursedetail['lo_' . $i . '_%'] < 50) {
+                        if ($coursedetail['lo_'.$i.'_%'] < 50) {
                             $summary['passed_lo_cc']--;
                         }
                     }
@@ -249,14 +253,14 @@ class StudentReportController extends Controller
                     $summary['total_lo_tc'] += $coursedetail['total_los'];
                     $summary['passed_tc']++;
                     for ($i = 1; $i <= $coursedetail['total_los']; $i++) {
-                        if ($coursedetail['lo_' . $i . '_%'] < 50) {
+                        if ($coursedetail['lo_'.$i.'_%'] < 50) {
                             $summary['passed_tc']--;
                             break;
                         }
                     }
                     $summary['passed_lo_tc'] += $coursedetail['total_los'];
                     for ($i = 1; $i <= $coursedetail['total_los']; $i++) {
-                        if ($coursedetail['lo_' . $i . '_%'] < 50) {
+                        if ($coursedetail['lo_'.$i.'_%'] < 50) {
                             $summary['passed_lo_tc']--;
                         }
                     }
@@ -268,29 +272,48 @@ class StudentReportController extends Controller
             $summary['total_lo_c'] = $summary['total_lo_cc'] + $summary['total_lo_tc'];
             $summary['passed_lo_c'] = $summary['passed_lo_cc'] + $summary['passed_lo_tc'];
 
-            if ($summary['total_cc'] != 0) $summary['angle_cc'] = $summary['passed_cc'] * 180 / $summary['total_cc'];
-            else $summary['angle_cc'] = 0;
+            if ($summary['total_cc'] != 0) {
+                $summary['angle_cc'] = $summary['passed_cc'] * 180 / $summary['total_cc'];
+            } else {
+                $summary['angle_cc'] = 0;
+            }
 
-            if ($summary['total_tc'] != 0) $summary['angle_tc'] = $summary['passed_tc'] * 180 / $summary['total_tc'];
-            else $summary['angle_tc'] = 0;
+            if ($summary['total_tc'] != 0) {
+                $summary['angle_tc'] = $summary['passed_tc'] * 180 / $summary['total_tc'];
+            } else {
+                $summary['angle_tc'] = 0;
+            }
 
-            if ($summary['total_lo_cc'] != 0) $summary['angle_c'] = $summary['passed_c'] * 180 / $summary['total_c'];
-            else $summary['angle_c'] = 0;
+            if ($summary['total_c'] != 0) {
+                $summary['angle_c'] = $summary['passed_c'] * 180 / $summary['total_c'];
+            } else {
+                $summary['angle_c'] = 0;
+            }
 
-            if ($summary['total_lo_cc'] != 0) $summary['angle_lo_cc'] = $summary['passed_lo_cc'] * 180 / $summary['total_lo_cc'];
-            else $summary['angle_lo_cc'] = 0;
+            if ($summary['total_lo_cc'] != 0) {
+                $summary['angle_lo_cc'] = $summary['passed_lo_cc'] * 180 / $summary['total_lo_cc'];
+            } else {
+                $summary['angle_lo_cc'] = 0;
+            }
 
-            if ($summary['total_lo_tc'] != 0) $summary['angle_lo_tc'] = $summary['passed_lo_tc'] * 180 / $summary['total_lo_tc'];
-            else $summary['angle_lo_tc'] = 0;
+            if ($summary['total_lo_tc'] != 0) {
+                $summary['angle_lo_tc'] = $summary['passed_lo_tc'] * 180 / $summary['total_lo_tc'];
+            } else {
+                $summary['angle_lo_tc'] = 0;
+            }
 
-            if ($summary['total_lo_c'] != 0) $summary['angle_lo_c'] = $summary['passed_lo_c'] * 180 / $summary['total_lo_c'];
-            else $summary['angle_lo_c'] = 0;
+            if ($summary['total_lo_c'] != 0) {
+                $summary['angle_lo_c'] = $summary['passed_lo_c'] * 180 / $summary['total_lo_c'];
+            } else {
+                $summary['angle_lo_c'] = 0;
+            }
         } catch (\Throwable $th) {
             $this->failed($th);
-            return back()->withErrors("There was a problem, please check the logs to see more about this!");
+
+            return back()->withErrors('There was a problem, please check the logs to see more about this!');
         }
 
-        $this->passed($student_id . ' student report was viewed');
+        $this->passed($student_id.' student report was viewed');
 
         return view('dmiesys.academics.view-student-report', compact('studentdetails', 'coursedetails', 'summary'));
     }

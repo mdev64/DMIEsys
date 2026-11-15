@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire;
 
+use Illuminate\View\View;
 use Livewire\Component;
 
 class InstantNotification extends Component
@@ -11,19 +12,20 @@ class InstantNotification extends Component
 
     /** @var bool */
     public $has_notification = false;
+
     /** @var string */
     public $notification = '';
+
     /** @var string */
     public $time = '';
 
     /**
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function render()
     {
-        $all_unread_notification = auth()->user()->unreadNotifications;
-        $recent_notification = $all_unread_notification
-            ->where('created_at', '>=', now()->subSeconds(11)->toDateTimeString())->first();
+        $recent_notification = auth()->user()->unreadNotifications()
+            ->where('created_at', '>=', now()->subSeconds(11))->first();
         if ($recent_notification) {
             $this->has_notification = true;
             $this->notification = $recent_notification->data['text'];
